@@ -1,0 +1,227 @@
+
+services:
+  # API Gateway
+  api-gateway:
+    build: ./api-gateway
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=development
+      - AUTH_SERVICE_URL=http://auth-service:3001
+      - USER_SERVICE_URL=http://user-service:3002
+      - CATALOG_SERVICE_URL=http://catalog-service:3003
+      - ORDER_SERVICE_URL=http://order-service:3004
+      - PAYMENT_SERVICE_URL=http://payment-service:3005
+      - DELIVERY_SERVICE_URL=http://delivery-service:3006
+      - NOTIFICATION_SERVICE_URL=http://notification-service:3007
+      - SEARCH_SERVICE_URL=http://search-service:3008
+    depends_on:
+      - auth-service
+      - user-service
+      - catalog-service
+      - order-service
+      - payment-service
+      - delivery-service
+      - notification-service
+      - search-service
+    networks:
+      - quickbite-network
+
+  # Auth Service
+  auth-service:
+    build: ./auth-service
+    ports:
+      - "3001:3001"
+    environment:
+      - NODE_ENV=development
+      - PORT=3001
+      - JWT_ACCESS_SECRET=your-super-secret-access-key-change-in-production
+      - JWT_REFRESH_SECRET=your-super-secret-refresh-key-change-in-production
+      - JWT_ACCESS_EXPIRY=15m
+      - JWT_REFRESH_EXPIRY=7d
+      - REDIS_URL=redis://redis:6379
+      - DATABASE_URL=postgresql://quickbite:password@postgres:5432/auth_db
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - quickbite-network
+
+  # User Service
+  user-service:
+    build: ./user-service
+    ports:
+      - "3002:3002"
+    environment:
+      - NODE_ENV=development
+      - PORT=3002
+      - DATABASE_URL=postgresql://quickbite:password@postgres:5432/user_db
+    depends_on:
+      - postgres
+    networks:
+      - quickbite-network
+
+  # Catalog Service
+  catalog-service:
+    build: ./catalog-service
+    ports:
+      - "3003:3003"
+    environment:
+      - NODE_ENV=development
+      - PORT=3003
+      - DATABASE_URL=postgresql://quickbite:password@postgres:5432/catalog_db
+      - ELASTICSEARCH_URL=http://elasticsearch:9200
+    depends_on:
+      - postgres
+      - elasticsearch
+    networks:
+      - quickbite-network
+
+  # Order Service
+  order-service:
+    build: ./order-service
+    ports:
+      - "3004:3004"
+    environment:
+      - NODE_ENV=development
+      - PORT=3004
+      - DATABASE_URL=postgresql://quickbite:password@postgres:5432/order_db
+      - RABBITMQ_URL=amqp://rabbitmq:5672
+    depends_on:
+      - postgres
+      - rabbitmq
+    networks:
+      - quickbite-network
+
+  # Payment Service
+  payment-service:
+    build: ./payment-service
+    ports:
+      - "3005:3005"
+    environment:
+      - NODE_ENV=development
+      - PORT=3005
+      - DATABASE_URL=postgresql://quickbite:password@postgres:5432/payment_db
+      - PAYMENT_GATEWAY_URL=https://api.razorpay.com/v1/payments
+      - PAYMENT_GATEWAY_SECRET=your-razorpay-secret
+    depends_on:
+      - postgres
+    networks:
+      - quickbite-network
+
+  # Delivery Service
+  delivery-service:
+    build: ./delivery-service
+    ports:
+      - "3006:3006"
+    environment:
+      - NODE_ENV=development
+      - PORT=3006
+      - DATABASE_URL=postgresql://quickbite:password@postgres:5432/delivery_db
+      - RABBITMQ_URL=amqp://rabbitmq:5672
+    depends_on:
+      - postgres
+      - rabbitmq
+    networks:
+      - quickbite-network
+
+  # Notification Service
+  notification-service:
+    build: ./notification-service
+    ports:
+      - "3007:3007"
+    environment:
+      - NODE_ENV=development
+      - PORT=3007
+      - DATABASE_URL=postgresql://quickbite:password@postgres:5432/notification_db
+      - RABBITMQ_URL=amqp://rabbitmq:5672
+    depends_on:
+      - postgres
+      - rabbitmq
+    networks:
+      - quickbite-network
+
+  # Search Service
+  search-service:
+    build: ./search-service
+    ports:
+      - "3008:3008"
+    environment:
+      - NODE_ENV=development
+      - PORT=3008
+      - ELASTICSEARCH_URL=http://elasticsearch:9200
+    depends_on:
+      - elasticsearch
+    networks:
+      - quickbite-network
+
+  # Database
+  postgres:
+    image: postgres:14
+    environment:
+      - POSTGRES_USER=quickbite
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_MULTIPLE_DATABASES=auth_db,user_db,catalog_db,order_db,payment_db,delivery_db,notification_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/init-multiple-databases.sh:/docker-entrypoint-initdb.d/init-multiple-databases.sh
+    networks:
+      - quickbite-network
+
+  # Redis
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - quickbite-network
+
+  # RabbitMQ
+  rabbitmq:
+    image: rabbitmq:3-management
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      - RABBITMQ_DEFAULT_USER=guest
+      - RABBITMQ_DEFAULT_PASS=guest
+    networks:
+      - quickbite-network
+
+  # Elasticsearch
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.5.0
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+    ports:
+      - "9200:9200"
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+    networks:
+      - quickbite-network
+
+  # Kibana
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.5.0
+    ports:
+      - "5601:5601"
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+    depends_on:
+      - elasticsearch
+    networks:
+      - quickbite-network
+
+volumes:
+  postgres_data:
+  redis_data:
+  elasticsearch_data:
+
+networks:
+  quickbite-network:
+    driver: bridge

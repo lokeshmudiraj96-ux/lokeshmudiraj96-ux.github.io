@@ -1,0 +1,35 @@
+{
+  "name": "quickbite-backend",
+  "version": "1.0.0",
+  "description": "QuickBite Food Delivery Microservices Backend",
+  "scripts": {
+    "dev": "docker-compose up --build",
+    "prod": "docker-compose -f docker-compose.prod.yml up -d",
+    "stop": "docker-compose down",
+    "logs": "docker-compose logs -f",
+    "k8s:deploy": "kubectl apply -f k8s/",
+    "k8s:delete": "kubectl delete -f k8s/",
+    "format": "prettier --write \"**/*.{js,json,md}\"",
+    "lint": "eslint \"**/*.js\""
+  },
+  "devDependencies": {
+    "eslint": "^8.0.0",
+    "prettier": "^2.8.0"
+  },
+  "workspaces": [
+    "api-gateway",
+    "auth-service",
+    "user-service",
+    "catalog-service",
+    "order-service",
+    "payment-service",
+    "delivery-service",
+    "notification-service",
+    "search-service",
+    "admin-service",
+    "analytics-service"
+  ],
+  "dependencies": {
+    "express": "^5.1.0"
+  }
+}
