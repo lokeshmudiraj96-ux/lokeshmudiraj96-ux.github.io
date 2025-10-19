@@ -871,11 +871,34 @@
                     <i class="fas fa-utensils logo-icon"></i>
                     QuickBite
                 </a>
+<!-- Replace your existing .location-selector with this block -->
+<div id="location-detector" class="location-selector" aria-live="polite">
+  <button id="use-location-btn" class="btn btn-outline" aria-label="Detect my location">
+    <i class="fas fa-map-marker-alt"></i>
+    <span id="location-label">Select location</span>
+  </button>
 
-                <div class="location-selector">
-                    <i class="fas fa-map-marker-alt"></i>
-                    <span>Select location</span>
-                </div>
+  <div id="location-controls" class="hidden" style="position:relative;">
+    <input id="location-search" type="search" placeholder="Search for address or city..." aria-label="Search location" class="search-input" />
+    <ul id="location-suggestions" role="listbox" class="hidden" style="position:absolute; z-index:1100; left:0; right:0; background:white; border:1px solid var(--gray-200); border-radius:8px; max-height:240px; overflow:auto; list-style:none; padding:0; margin-top:4px;"></ul>
+    <div id="location-actions" style="margin-top:6px; display:flex; gap:8px;">
+      <button id="use-geo" class="btn btn-primary btn-sm">Use my location</button>
+      <button id="use-ip" class="btn btn-outline btn-sm">Detect by IP</button>
+      <button id="close-location" class="btn btn-sm">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- Add small component styles (you can move to your CSS file) -->
+<style>
+  #location-detector .search-input { padding: 8px 12px; }
+  #location-suggestions li { padding:8px 12px; cursor:pointer; border-bottom:1px solid var(--gray-100); }
+  #location-suggestions li[aria-selected="true"], #location-suggestions li:hover { background:var(--primary-50); color:var(--primary-700); }
+  #location-controls.hidden { display:none; }
+</style>
+
+<!-- Include the JS file at the end of body (adjust path if necessary) -->
+<script src="./location-detector.js"></script>
 
                 <div class="nav-search desktop-only">
                     <i class="fas fa-search search-icon"></i>
