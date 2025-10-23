@@ -1,30 +1,48 @@
-const { Pool } = require('pg');
+const sql = require('mssql');
 
-const pool = new Pool({
+const config = {
   connectionString: process.env.DATABASE_URL,
-  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
-  max: 20,
-  idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 2000,
-});
+  options: {
+    encrypt: true,
+    enableArithAbort: true,
+    trustServerCertificate: false
+  },
+  pool: {
+    max: 20,
+    min: 0,
+    idleTimeoutMillis: 30000
+  },
+  connectionTimeout: 15000,
+  requestTimeout: 15000
+};
 
-pool.on('connect', () => {
-  console.log('✅ PostgreSQL connected');
-});
-
-pool.on('error', (err) => {
-  console.error('❌ PostgreSQL connection error:', err);
-  process.exit(-1);
-});
+let pool;
 
 const connectDB = async () => {
   try {
-    await pool.query('SELECT NOW()');
+    if (pool) {
+      return pool;
+    }
+    
+    pool = await sql.connect(config);
+    console.log('✅ SQL Server connected');
+    
+    // Test connection
+    await pool.request().query('SELECT GETDATE()');
     console.log('✅ Database connection successful');
+    
+    return pool;
   } catch (error) {
     console.error('❌ Database connection failed:', error.message);
     process.exit(1);
   }
 };
 
-module.exports = { pool, connectDB };
+const getPool = () => {
+  if (!pool) {
+    throw new Error('Database not connected. Call connectDB() first.');
+  }
+  return pool;
+};
+
+module.exports = { sql, connectDB, getPool };

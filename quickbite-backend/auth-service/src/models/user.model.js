@@ -1,41 +1,58 @@
-const { pool } = require('../config/database');
+const { getPool, sql } = require('../config/database');
 const bcrypt = require('bcryptjs');
 
 class User {
   // Create new user
   static async create({ name, email, phone, password, role = 'customer', storeId = null }) {
     const passwordHash = await bcrypt.hash(password, 10);
+    const pool = getPool();
     
     const query = `
       INSERT INTO users (name, email, phone, password_hash, role, store_id)
-      VALUES ($1, $2, $3, $4, $5, $6)
-      RETURNING id, name, email, phone, role, store_id, is_verified, created_at
+      OUTPUT INSERTED.id, INSERTED.name, INSERTED.email, INSERTED.phone, INSERTED.role, INSERTED.store_id, INSERTED.is_verified, INSERTED.created_at
+      VALUES (@name, @email, @phone, @passwordHash, @role, @storeId)
     `;
     
-    const values = [name, email, phone, passwordHash, role, storeId];
-    const result = await pool.query(query, values);
-    return result.rows[0];
+    const result = await pool.request()
+      .input('name', sql.NVarChar, name)
+      .input('email', sql.NVarChar, email)
+      .input('phone', sql.NVarChar, phone)
+      .input('passwordHash', sql.NVarChar, passwordHash)
+      .input('role', sql.NVarChar, role)
+      .input('storeId', sql.UniqueIdentifier, storeId)
+      .query(query);
+    
+    return result.recordset[0];
   }
 
   // Find user by email
   static async findByEmail(email) {
-    const query = 'SELECT * FROM users WHERE email = $1 AND is_active = true';
-    const result = await pool.query(query, [email]);
-    return result.rows[0];
+    const pool = getPool();
+    const query = 'SELECT * FROM users WHERE email = @email AND is_active = 1';
+    const result = await pool.request()
+      .input('email', sql.NVarChar, email)
+      .query(query);
+    return result.recordset[0];
   }
 
   // Find user by phone
   static async findByPhone(phone) {
-    const query = 'SELECT * FROM users WHERE phone = $1 AND is_active = true';
-    const result = await pool.query(query, [phone]);
-    return result.rows[0];
+    const pool = getPool();
+    const query = 'SELECT * FROM users WHERE phone = @phone AND is_active = 1';
+    const result = await pool.request()
+      .input('phone', sql.NVarChar, phone)
+      .query(query);
+    return result.recordset[0];
   }
 
   // Find user by ID
   static async findById(id) {
-    const query = 'SELECT id, name, email, phone, role, store_id, is_verified, created_at FROM users WHERE id = $1 AND is_active = true';
-    const result = await pool.query(query, [id]);
-    return result.rows[0];
+    const pool = getPool();
+    const query = 'SELECT id, name, email, phone, role, store_id, is_verified, created_at FROM users WHERE id = @id AND is_active = 1';
+    const result = await pool.request()
+      .input('id', sql.UniqueIdentifier, id)
+      .query(query);
+    return result.recordset[0];
   }
 
   // Verify password
@@ -45,15 +62,12 @@ class User {
 
   // Update user
   static async update(id, updates) {
+    const pool = getPool();
     const fields = [];
-    const values = [];
-    let paramCount = 1;
 
     Object.keys(updates).forEach((key) => {
       if (updates[key] !== undefined) {
-        fields.push(`${key} = $${paramCount}`);
-        values.push(updates[key]);
-        paramCount++;
+        fields.push(`${key} = @${key}`);
       }
     });
 
@@ -61,36 +75,52 @@ class User {
       throw new Error('No fields to update');
     }
 
-    values.push(id);
     const query = `
       UPDATE users 
-      SET ${fields.join(', ')} 
-      WHERE id = $${paramCount}
-      RETURNING id, name, email, phone, role, store_id, is_verified, created_at
+      SET ${fields.join(', ')}
+      OUTPUT INSERTED.id, INSERTED.name, INSERTED.email, INSERTED.phone, INSERTED.role, INSERTED.store_id, INSERTED.is_verified, INSERTED.created_at
+      WHERE id = @id
     `;
 
-    const result = await pool.query(query, values);
-    return result.rows[0];
+    const request = pool.request().input('id', sql.UniqueIdentifier, id);
+    Object.keys(updates).forEach((key) => {
+      if (updates[key] !== undefined) {
+        request.input(key, updates[key]);
+      }
+    });
+
+    const result = await request.query(query);
+    return result.recordset[0];
   }
 
   // Mark user as verified
   static async markAsVerified(id) {
-    const query = 'UPDATE users SET is_verified = true WHERE id = $1 RETURNING *';
-    const result = await pool.query(query, [id]);
-    return result.rows[0];
+    const pool = getPool();
+    const query = 'UPDATE users SET is_verified = 1 OUTPUT INSERTED.* WHERE id = @id';
+    const result = await pool.request()
+      .input('id', sql.UniqueIdentifier, id)
+      .query(query);
+    return result.recordset[0];
   }
 
   // Update password
   static async updatePassword(id, newPassword) {
+    const pool = getPool();
     const passwordHash = await bcrypt.hash(newPassword, 10);
-    const query = 'UPDATE users SET password_hash = $1 WHERE id = $2';
-    await pool.query(query, [passwordHash, id]);
+    const query = 'UPDATE users SET password_hash = @passwordHash WHERE id = @id';
+    await pool.request()
+      .input('id', sql.UniqueIdentifier, id)
+      .input('passwordHash', sql.NVarChar, passwordHash)
+      .query(query);
   }
 
   // Soft delete user
   static async deactivate(id) {
-    const query = 'UPDATE users SET is_active = false WHERE id = $1';
-    await pool.query(query, [id]);
+    const pool = getPool();
+    const query = 'UPDATE users SET is_active = 0 WHERE id = @id';
+    await pool.request()
+      .input('id', sql.UniqueIdentifier, id)
+      .query(query);
   }
 }
 
