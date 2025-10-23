@@ -1,3 +1,6 @@
+// Deprecated legacy file (Mongo/old API). Do not use.
+// The service entrypoint is src/server.js using SQL Server. This stub remains only to avoid accidental usage.
+throw new Error('Deprecated file: use src/server.js instead.');
 const express = require('express');
 const dotenv = require('dotenv');
 const connectDB = require('./config/db');

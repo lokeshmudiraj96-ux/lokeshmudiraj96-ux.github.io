@@ -113,15 +113,6 @@ class User {
       .input('passwordHash', sql.NVarChar, passwordHash)
       .query(query);
   }
-
-  // Soft delete user
-  static async deactivate(id) {
-    const pool = getPool();
-    const query = 'UPDATE users SET is_active = 0 WHERE id = @id';
-    await pool.request()
-      .input('id', sql.UniqueIdentifier, id)
-      .query(query);
-  }
 }
 
 module.exports = User;

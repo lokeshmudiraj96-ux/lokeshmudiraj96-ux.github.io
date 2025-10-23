@@ -107,22 +107,6 @@ class UserController {
       next(error);
     }
   }
-
-  // Delete account
-  async deleteAccount(req, res, next) {
-    try {
-      const userId = req.user.id;
-
-      await User.deactivate(userId);
-
-      res.status(200).json({
-        success: true,
-        message: 'Account deleted successfully'
-      });
-    } catch (error) {
-      next(error);
-    }
-  }
 }
 
 module.exports = new UserController();

@@ -1,3 +1,4 @@
+-- DEPRECATED: Postgres schema is obsolete. Use schema-sqlserver.sql instead.
 -- Auth Service Database Schema
 
 -- Users table

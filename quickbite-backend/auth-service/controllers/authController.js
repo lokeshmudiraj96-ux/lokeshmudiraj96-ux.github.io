@@ -1,3 +1,5 @@
+// Deprecated legacy controller (Mongo/old API). Do not use.
+throw new Error('Deprecated file: use src/controllers/* with SQL Server models.');
 const User = require('../models/user.models');
 const jwt = require('jsonwebtoken');
 const sendEmail = require('../utils/sendEmail');

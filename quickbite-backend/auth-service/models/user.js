@@ -1,3 +1,5 @@
+// Deprecated legacy Mongo model. Do not use.
+throw new Error('Deprecated file: use src/models/*.model.js (SQL Server).');
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 

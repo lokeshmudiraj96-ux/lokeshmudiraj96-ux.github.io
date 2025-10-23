@@ -1,3 +1,5 @@
+// Deprecated legacy Mongo connection. Do not use.
+throw new Error('Deprecated file: MongoDB is no longer used. Use src/config/database.js (SQL Server).');
 const mongoose = require('mongoose');
 
 const connectDB = async () => {
