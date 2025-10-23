@@ -64,7 +64,8 @@ jobs:
             # Ensure app exists (if not, create Linux plan + webapp)
             if ! az webapp show -g ${{ env.AZURE_RESOURCE_GROUP }} -n ${{ env.AZURE_WEBAPP_NAME }} >/dev/null 2>&1; then
               PLAN=${{ env.AZURE_WEBAPP_NAME }}-plan
-              az appservice plan create -g ${{ env.AZURE_RESOURCE_GROUP }} -n $PLAN --is-linux --sku F1 --location ${{ env.AZURE_REGION }}
+              # B1 required for Linux custom containers; request quota increase if creation fails
+              az appservice plan create -g ${{ env.AZURE_RESOURCE_GROUP }} -n $PLAN --is-linux --sku B1 --location ${{ env.AZURE_REGION }}
               az webapp create -g ${{ env.AZURE_RESOURCE_GROUP }} -p $PLAN -n ${{ env.AZURE_WEBAPP_NAME }} --runtime "NODE|18-lts" --deployment-container-image-name $IMAGE
             fi
             # Configure container from ACR
