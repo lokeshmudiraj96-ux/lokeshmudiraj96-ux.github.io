@@ -29,12 +29,21 @@ jobs:
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }} # Service principal JSON
 
-      - name: Azure CLI - ensure ACR login
-        uses: azure/cli@v2
+      - name: Get ACR credentials
+        id: acr-creds
+        run: |
+          ACR_USERNAME=$(az acr credential show -n ${{ env.AZURE_ACR_NAME }} --query username -o tsv)
+          ACR_PASSWORD=$(az acr credential show -n ${{ env.AZURE_ACR_NAME }} --query "passwords[0].value" -o tsv)
+          echo "::add-mask::$ACR_PASSWORD"
+          echo "username=$ACR_USERNAME" >> $GITHUB_OUTPUT
+          echo "password=$ACR_PASSWORD" >> $GITHUB_OUTPUT
+      
+      - name: Login to Azure Container Registry
+        uses: docker/login-action@v3
         with:
-          inlineScript: |
-            az account show -o table
-            az acr login -n ${{ env.AZURE_ACR_NAME }}
+          registry: ${{ env.AZURE_ACR_NAME }}.azurecr.io
+          username: ${{ steps.acr-creds.outputs.username }}
+          password: ${{ steps.acr-creds.outputs.password }}
 
       - name: Build, tag, and push image to ACR
         env:
