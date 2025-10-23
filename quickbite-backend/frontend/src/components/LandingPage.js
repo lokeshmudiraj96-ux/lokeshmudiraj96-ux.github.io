@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { Container, Box, Typography, Button, AppBar, Toolbar } from '@mui/material';
+import { Container, Box, Typography, Button } from '@mui/material';
 
 const LandingPage = () => {
   const navigate = useNavigate();
@@ -16,54 +16,6 @@ const LandingPage = () => {
 
   return (
     <Box sx={{ minHeight: '100vh', bgcolor: '#fafafa' }}>
-      {/* Navigation Header */}
-      <AppBar position="static" sx={{ bgcolor: 'white', boxShadow: 1 }}>
-        <Toolbar>
-          <Typography variant="h6" component="div" sx={{ flexGrow: 1, color: '#fc8019', fontWeight: 'bold' }}>
-            QuickBite
-          </Typography>
-          {isAuthenticated ? (
-            <>
-              <Typography sx={{ mr: 2, color: '#616161' }}>
-                Welcome, {user?.name}
-              </Typography>
-              <Button 
-                component={Link} 
-                to="/profile" 
-                sx={{ mr: 1, color: '#616161' }}
-              >
-                Profile
-              </Button>
-              <Button 
-                onClick={logout}
-                variant="outlined"
-                sx={{ borderColor: '#fc8019', color: '#fc8019' }}
-              >
-                Logout
-              </Button>
-            </>
-          ) : (
-            <>
-              <Button 
-                component={Link} 
-                to="/login" 
-                sx={{ mr: 1, color: '#616161' }}
-              >
-                Login
-              </Button>
-              <Button 
-                component={Link} 
-                to="/register" 
-                variant="contained"
-                sx={{ bgcolor: '#fc8019', '&:hover': { bgcolor: '#e56513' } }}
-              >
-                Sign Up
-              </Button>
-            </>
-          )}
-        </Toolbar>
-      </AppBar>
-
       {/* Hero Section */}
       <Container maxWidth="lg">
         <Box sx={{ 

@@ -3,11 +3,18 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import { AuthProvider } from './context/AuthContext';
+import { CartProvider } from './context/CartContext';
 import PrivateRoute from './components/PrivateRoute';
 import LandingPage from './components/LandingPage';
 import Login from './components/Login';
 import Register from './components/Register';
 import Profile from './components/Profile';
+import NavBar from './components/NavBar';
+import Footer from './components/Footer';
+import Catalog from './pages/Catalog';
+import Cart from './pages/Cart';
+import Checkout from './pages/Checkout';
+import Orders from './pages/Orders';
 
 const theme = createTheme({
   palette: {
@@ -25,10 +32,14 @@ function App() {
     <ThemeProvider theme={theme}>
       <CssBaseline />
       <AuthProvider>
-        <Router>
-          <Routes>
+        <CartProvider>
+          <Router>
+            <NavBar />
+            <Routes>
             {/* Public Routes */}
             <Route path="/" element={<LandingPage />} />
+            <Route path="/catalog" element={<Catalog />} />
+            <Route path="/cart" element={<Cart />} />
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
             
@@ -42,6 +53,22 @@ function App() {
               } 
             />
             <Route 
+              path="/checkout" 
+              element={
+                <PrivateRoute>
+                  <Checkout />
+                </PrivateRoute>
+              } 
+            />
+            <Route 
+              path="/orders" 
+              element={
+                <PrivateRoute>
+                  <Orders />
+                </PrivateRoute>
+              } 
+            />
+            <Route 
               path="/dashboard" 
               element={
                 <PrivateRoute>
@@ -49,8 +76,10 @@ function App() {
                 </PrivateRoute>
               } 
             />
-          </Routes>
-        </Router>
+            </Routes>
+            <Footer />
+          </Router>
+        </CartProvider>
       </AuthProvider>
     </ThemeProvider>
   );
