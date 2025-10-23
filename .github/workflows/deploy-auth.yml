@@ -1,0 +1,80 @@
+name: Deploy Auth Service to AWS ECS
+
+on:
+  push:
+    branches: [ "main" ]
+    paths:
+      - 'quickbite-backend/auth-service/**'
+  workflow_dispatch:
+
+env:
+  AWS_REGION: ${{ secrets.AWS_REGION }}
+  ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY }} # e.g., quickbite-auth
+  ECS_CLUSTER: ${{ secrets.ECS_CLUSTER }}       # e.g., quickbite-cluster
+  ECS_SERVICE: ${{ secrets.ECS_SERVICE }}       # e.g., quickbite-auth-service
+  EXECUTION_ROLE_ARN: ${{ secrets.ECS_TASK_EXECUTION_ROLE_ARN }}
+  TASK_ROLE_ARN: ${{ secrets.ECS_TASK_ROLE_ARN }}
+  JWT_SECRET: ${{ secrets.JWT_SECRET }}
+  DATABASE_URL: ${{ secrets.DATABASE_URL }}
+  REDIS_URL: ${{ secrets.REDIS_URL }}
+  FRONTEND_URL: ${{ secrets.FRONTEND_URL }}
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build, tag, and push image to Amazon ECR
+        id: build-image
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          docker build -t $ECR_REGISTRY/${{ env.ECR_REPOSITORY }}:$IMAGE_TAG ./quickbite-backend/auth-service
+          docker tag $ECR_REGISTRY/${{ env.ECR_REPOSITORY }}:$IMAGE_TAG $ECR_REGISTRY/${{ env.ECR_REPOSITORY }}:latest
+          docker push $ECR_REGISTRY/${{ env.ECR_REPOSITORY }}:$IMAGE_TAG
+          docker push $ECR_REGISTRY/${{ env.ECR_REPOSITORY }}:latest
+          echo "image=$ECR_REGISTRY/${{ env.ECR_REPOSITORY }}:$IMAGE_TAG" >> $GITHUB_OUTPUT
+
+      - name: Resolve task definition placeholders (roles/region)
+        run: |
+          sed -e "s|\${EXECUTION_ROLE_ARN}|${{ env.EXECUTION_ROLE_ARN }}|g" \
+              -e "s|\${TASK_ROLE_ARN}|${{ env.TASK_ROLE_ARN }}|g" \
+              -e "s|\${AWS_REGION}|${{ env.AWS_REGION }}|g" \
+              quickbite-backend/auth-service/deploy/taskdef.json > taskdef.resolved.json
+
+      - name: Render task definition
+        id: task-def
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
+        with:
+          task-definition: taskdef.resolved.json
+          container-name: auth-service
+          image: ${{ steps.build-image.outputs.image }}
+          environment-variables: |
+            AWS_REGION=${{ env.AWS_REGION }}
+            JWT_SECRET=${{ env.JWT_SECRET }}
+            DATABASE_URL=${{ env.DATABASE_URL }}
+            REDIS_URL=${{ env.REDIS_URL }}
+            FRONTEND_URL=${{ env.FRONTEND_URL }}
+
+      - name: Deploy to Amazon ECS
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v2
+        with:
+          task-definition: ${{ steps.task-def.outputs.task-definition }}
+          service: ${{ env.ECS_SERVICE }}
+          cluster: ${{ env.ECS_CLUSTER }}
+          wait-for-service-stability: true

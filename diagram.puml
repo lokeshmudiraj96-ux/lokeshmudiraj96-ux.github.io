@@ -1,0 +1,121 @@
+@startuml
+' Corrected version (no syntax error)
+
+actor User
+participant Frontend
+participant APIGateway
+
+box "Auth & Catalog" #LightBlue
+  participant AuthService
+  participant CatalogService
+end box
+
+box "Core Orchestration" #LightGreen
+  participant OrderService
+  participant PaymentService
+  participant DeliveryService
+end box
+
+participant NotificationService
+
+== Authentication ==
+User -> Frontend : open app -> request OTP
+Frontend -> APIGateway : POST /auth/otp { phone }
+APIGateway -> AuthService : POST /otp
+AuthService --> APIGateway : 200 OTP_SENT
+APIGateway --> Frontend : 200 OTP_SENT
+
+User -> Frontend : submit OTP
+Frontend -> APIGateway : POST /auth/verify { phone, otp }
+APIGateway -> AuthService : POST /verify
+alt valid
+  AuthService --> APIGateway : 200 { access_token, refresh_token }
+  APIGateway --> Frontend : 200 { tokens }
+else invalid
+  AuthService --> APIGateway : 400 OTP_INVALID
+  APIGateway --> Frontend : 400 OTP_INVALID
+end
+
+== Discovery & Order ==
+Frontend -> APIGateway : GET /catalog/merchants?lat=&lng=
+APIGateway -> CatalogService : GET /merchants
+CatalogService --> APIGateway : 200 { merchants[] }
+APIGateway --> Frontend : 200
+
+User -> Frontend : add to cart -> checkout
+Frontend -> APIGateway : POST /orders { cart, merchant_id, address }
+APIGateway -> OrderService : POST /orders
+OrderService -> CatalogService : validate items & prices
+CatalogService --> OrderService : 200
+OrderService -> OrderService : compute totals & persist
+OrderService --> APIGateway : 201 { order_id, status:PENDING }
+APIGateway --> Frontend : 201
+
+== Payment (success / failure inline) ==
+Frontend -> APIGateway : POST /payment/pay { order_id, method }
+APIGateway -> PaymentService : POST /pay { order_id, method, amount }
+PaymentService -> PaymentService : call aggregator
+alt aggregator success (webhook)
+  PaymentService -> OrderService : POST /payments/confirm { order_id, status:SUCCESS }
+  OrderService -> OrderService : set status CONFIRMED
+  OrderService -> NotificationService : POST /send { template:order_confirmed }
+else aggregator failed (webhook)
+  PaymentService -> OrderService : POST /payments/confirm { order_id, status:FAILED }
+  OrderService -> OrderService : set status PAYMENT_FAILED
+  OrderService -> NotificationService : POST /send { template:payment_failed }
+  alt user retries
+    Frontend -> APIGateway : POST /payment/pay { order_id } [new idempotency key]
+    APIGateway -> PaymentService : POST /pay ...
+  else user cancels
+    Frontend -> APIGateway : POST /orders/{order_id}/cancel
+    APIGateway -> OrderService : CANCEL
+    OrderService -> NotificationService : POST /send { template:order_cancelled }
+  end
+end
+
+== Delivery assignment & tracking ==
+OrderService -> DeliveryService : POST /assign { order_id }
+alt agent found
+  DeliveryService --> OrderService : 200 { delivery_id, agent_id }
+  OrderService -> NotificationService : POST /send { template:delivery_assigned }
+else no agent found
+  DeliveryService --> OrderService : 503 ASSIGNMENT_FAILED
+  alt retry < 3
+    OrderService -> DeliveryService : POST /assign (retry)
+  else mark delayed
+    OrderService -> OrderService : set DELIVERY_DELAYED
+    OrderService -> NotificationService : POST /send { template:delivery_delayed }
+  end
+end
+
+loop every 3-5s
+  DeliveryService -> APIGateway : PATCH /delivery/{id}/location { lat,lng }
+  APIGateway -> OrderService : POST /events/delivery/location { delivery_id, lat, lng }
+  OrderService -> Frontend : websocket push location
+end
+
+alt delivered
+  DeliveryService -> OrderService : PATCH { status:DELIVERED }
+  OrderService -> OrderService : set COMPLETED
+  OrderService -> NotificationService : POST /send { template:order_delivered }
+else failed
+  DeliveryService -> OrderService : PATCH { status:FAILED }
+  OrderService -> NotificationService : POST /send { template:delivery_failed }
+  OrderService -> DeliveryService : request retry/reassign
+end
+
+== Async Notification ==
+NotificationService -> NotificationService : dequeue message
+alt PUSH channel
+  NotificationService -> Frontend : push to FCM/APNs
+else SMS/EMAIL
+  NotificationService -> ExternalGateway : send SMS/email
+  alt failure
+    NotificationService -> NotificationService : retry backoff x2
+    alt still failed
+      NotificationService -> NotificationService : mark FAILED & log
+    end
+  end
+end
+
+@enduml
