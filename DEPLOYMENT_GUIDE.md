@@ -4,7 +4,7 @@
 
 ### **Production Deployment**
 - **Frontend**: https://lokeshmudiraj96-ux.github.io
-- **Backend API**: https://quickbite-backend-production.up.railway.app
+- **Backend API**: https://lokeshmudiraj96-uxgithubio-production.up.railway.app
 - **Demo Login**: `demo@quickbite.com` / `demo123`
 
 ### **Development/Testing**  
@@ -35,7 +35,7 @@
 
 4. **Deploy Commands**:
    - Build Command: `npm install`
-   - Start Command: `node demo-setup.js`
+   - Start Command: `https://railway.com/project/f4024c71-ae12-43a6-b63e-ff040a9d434b/service/81df5a2d-4d2b-41c8-b918-1f5ffd922444/settings?environmentId=1ba37b81-86be-43c8-949a-86db6108e490`
 
 ### **Step 2: Deploy Frontend to GitHub Pages**
 
@@ -60,7 +60,7 @@ The frontend will automatically use production API URL when deployed.
 
 ### **Backend Health Check**
 ```bash
-curl https://quickbite-backend-production.up.railway.app/health
+curl https://lokeshmudiraj96-uxgithubio-production.up.railway.app/health
 ```
 
 Expected response:
