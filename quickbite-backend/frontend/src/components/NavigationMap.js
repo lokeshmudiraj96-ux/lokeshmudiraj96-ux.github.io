@@ -36,13 +36,20 @@ const NavigationMap = ({
   const directionsRendererRef = useRef(null);
   const markersRef = useRef([]);
 
-  const { location, detect, loading: locationLoading, isLocationAccurate, isLocationRecent } = useLocationCtx();
+  const { location, detect, loading: locationLoading, isLocationAccurate } = useLocationCtx();
 
   const [isMapLoaded, setIsMapLoaded] = useState(false);
   const [travelMode, setTravelMode] = useState('DRIVING');
   const [routeInfo, setRouteInfo] = useState(null);
   const [isCalculatingRoute, setIsCalculatingRoute] = useState(false);
   const [mapError, setMapError] = useState(null);
+
+  // Check if location is recent (within 5 minutes)
+  const isLocationRecent = useCallback(() => {
+    if (!location || !location.timestamp) return true; // Assume recent if no timestamp
+    const fiveMinutesAgo = Date.now() - (5 * 60 * 1000);
+    return location.timestamp > fiveMinutesAgo;
+  }, [location]);
 
   // Load Google Maps API
   const loadGoogleMapsAPI = useCallback(() => {

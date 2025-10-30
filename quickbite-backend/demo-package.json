@@ -1,0 +1,17 @@
+{
+  "name": "quickbite-demo-server",
+  "version": "1.0.0",
+  "description": "Local demo server for QuickBite platform testing",
+  "main": "demo-setup.js",
+  "scripts": {
+    "start": "node demo-setup.js",
+    "dev": "node demo-setup.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "cors": "^2.8.5"
+  },
+  "keywords": ["quickbite", "demo", "food-delivery"],
+  "author": "QuickBite Team",
+  "license": "MIT"
+}

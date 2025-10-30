@@ -1,0 +1,21 @@
+{
+  "name": "quickbite-backend-production",
+  "version": "1.0.0",
+  "description": "QuickBite Food Delivery Platform - Production Backend",
+  "main": "demo-setup.js",
+  "scripts": {
+    "start": "node demo-setup.js",
+    "dev": "node demo-setup.js",
+    "health": "curl -f http://localhost:$PORT/health || exit 1"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "cors": "^2.8.5"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "keywords": ["quickbite", "food-delivery", "api", "nodejs"],
+  "author": "QuickBite Team",
+  "license": "MIT"
+}
