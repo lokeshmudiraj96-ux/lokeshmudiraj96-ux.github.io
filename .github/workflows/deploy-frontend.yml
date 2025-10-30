@@ -38,8 +38,9 @@ jobs:
         cd quickbite-backend/frontend
         npm run build
       env:
-        REACT_APP_API_URL: https://lokeshmudiraj96-uxgithubio-production.up.railway.app/api
-        REACT_APP_DEMO_MODE: false
+        REACT_APP_API_URL: https://quickbite-demo-backend.onrender.com/api
+        REACT_APP_DEMO_MODE: true
+        REACT_APP_FALLBACK_MODE: true
         GENERATE_SOURCEMAP: false
         CI: false
     

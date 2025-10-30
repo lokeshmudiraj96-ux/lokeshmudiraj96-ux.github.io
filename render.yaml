@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: quickbite-demo-backend
+    env: node
+    plan: free
+    buildCommand: cd quickbite-backend && npm install
+    startCommand: cd quickbite-backend && node demo-setup.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3001
