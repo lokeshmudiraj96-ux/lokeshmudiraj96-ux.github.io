@@ -26,6 +26,10 @@ const NavBar = () => {
         <Button component={Link} to="/catalog" sx={{ color: '#424242', mr: 1 }}>
           Browse
         </Button>
+        
+        <Button component={Link} to="/home" sx={{ color: '#424242', mr: 1 }}>
+          Restaurants
+        </Button>
 
         <Chip
           label={location?.label ? `📍 ${location.label}` : (loading ? 'Detecting…' : 'Detect location')}

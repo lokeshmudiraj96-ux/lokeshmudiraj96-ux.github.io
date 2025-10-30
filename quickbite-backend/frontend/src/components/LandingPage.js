@@ -1,18 +1,16 @@
-import React, { useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import React from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Container, Box, Typography, Button } from '@mui/material';
+import HomePage from '../pages/HomePage';
 
 const LandingPage = () => {
-  const navigate = useNavigate();
-  const { isAuthenticated, user, logout } = useAuth();
+  const { isAuthenticated } = useAuth();
 
-  useEffect(() => {
-    // Redirect authenticated users to profile
-    if (isAuthenticated) {
-      navigate('/profile');
-    }
-  }, [isAuthenticated, navigate]);
+  // Show HomePage for authenticated users, welcome page for guests
+  if (isAuthenticated) {
+    return <HomePage />;
+  }
 
   return (
     <Box sx={{ minHeight: '100vh', bgcolor: '#fafafa' }}>
