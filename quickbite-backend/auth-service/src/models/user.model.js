@@ -1,11 +1,38 @@
 const { getPool, sql } = require('../config/database');
 const bcrypt = require('bcryptjs');
+const crypto = require('crypto');
+
+// In-memory storage for dev mode when database is not available
+const inMemoryUsers = new Map();
 
 class User {
   // Create new user
-  static async create({ name, email, phone, password, role = 'customer', storeId = null }) {
-    const passwordHash = await bcrypt.hash(password, 10);
+  static async create({ name, email, phone, password = '', role = 'customer', storeId = null }) {
     const pool = getPool();
+    
+    // DEV MODE: Use in-memory storage if no database
+    if (!pool) {
+      const id = crypto.randomUUID();
+      const user = {
+        id,
+        name: name || `User ${phone.slice(-4)}`,
+        email: email || null,
+        phone,
+        role,
+        store_id: storeId,
+        is_verified: true, // Auto-verify in dev mode
+        created_at: new Date(),
+        is_active: true
+      };
+      
+      inMemoryUsers.set(phone, user);
+      console.log(`✅ Created in-memory user: ${phone}`);
+      
+      return user;
+    }
+    
+    // PRODUCTION MODE: Use SQL Server
+    const passwordHash = await bcrypt.hash(password, 10);
     
     const query = `
       INSERT INTO users (name, email, phone, password_hash, role, store_id)
@@ -38,6 +65,13 @@ class User {
   // Find user by phone
   static async findByPhone(phone) {
     const pool = getPool();
+    
+    // DEV MODE: Use in-memory storage if no database
+    if (!pool) {
+      return inMemoryUsers.get(phone) || null;
+    }
+    
+    // PRODUCTION MODE: Use SQL Server
     const query = 'SELECT * FROM users WHERE phone = @phone AND is_active = 1';
     const result = await pool.request()
       .input('phone', sql.NVarChar, phone)
@@ -48,6 +82,18 @@ class User {
   // Find user by ID
   static async findById(id) {
     const pool = getPool();
+    
+    // DEV MODE: Use in-memory storage if no database
+    if (!pool) {
+      for (const user of inMemoryUsers.values()) {
+        if (user.id === id && user.is_active) {
+          return user;
+        }
+      }
+      return null;
+    }
+    
+    // PRODUCTION MODE: Use SQL Server
     const query = 'SELECT id, name, email, phone, role, store_id, is_verified, created_at FROM users WHERE id = @id AND is_active = 1';
     const result = await pool.request()
       .input('id', sql.UniqueIdentifier, id)

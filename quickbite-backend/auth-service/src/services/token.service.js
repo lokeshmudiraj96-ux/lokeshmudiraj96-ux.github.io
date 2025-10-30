@@ -40,10 +40,11 @@ class TokenService {
     const accessToken = this.generateAccessToken(userId, role, storeId);
     const refreshTokenData = await RefreshToken.create(userId);
     
+    // Return in snake_case to align with frontend
     return {
-      accessToken,
-      refreshToken: refreshTokenData.token,
-      expiresIn: 900 // 15 minutes in seconds
+      access_token: accessToken,
+      refresh_token: refreshTokenData.token,
+      expires_in: 900 // 15 minutes in seconds
     };
   }
 }

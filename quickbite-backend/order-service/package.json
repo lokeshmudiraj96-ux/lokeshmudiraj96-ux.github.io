@@ -16,7 +16,10 @@
     "helmet": "^6.0.1",
     "dotenv": "^16.0.3",
     "joi": "^17.7.0",
-    "uuid": "^9.0.0"
+    "uuid": "^9.0.0",
+    "socket.io": "^4.6.1",
+    "pg": "^8.11.0",
+    "compression": "^1.7.4"
   },
   "devDependencies": {
     "nodemon": "^2.0.20",

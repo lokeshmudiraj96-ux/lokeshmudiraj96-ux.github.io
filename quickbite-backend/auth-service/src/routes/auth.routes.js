@@ -4,8 +4,13 @@ const authController = require('../controllers/auth.controller');
 const { authenticate } = require('../middleware/auth.middleware');
 
 // OTP-based authentication
-router.post('/otp/request', authController.requestOTP);
-router.post('/otp/verify', authController.verifyOTP);
+router.post('/otp/request', authController.requestOTP); // legacy alias
+router.post('/otp/verify', authController.verifyOTP);   // legacy alias
+
+// LLR-aligned endpoints
+router.post('/otp', authController.requestOTP);
+router.post('/verify', authController.verifyOTP);
+router.post('/introspect', authController.introspect);
 
 // Email/Password authentication
 router.post('/register', authController.register);

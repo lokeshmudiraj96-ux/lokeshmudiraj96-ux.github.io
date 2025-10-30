@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>QuickBite - Food & Grocery Delivery Platform</title>
+    <link rel="manifest" href="./manifest.json">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         /* CSS Custom Properties for Design System */
@@ -102,6 +103,22 @@
             color: var(--gray-900);
             font-size: var(--text-base);
             min-height: 100vh;
+        }
+
+        /* Dark Theme */
+        body.dark {
+            --gray-50: #0b0b0c;
+            --gray-100: #111214;
+            --gray-200: #191a1d;
+            --gray-300: #222427;
+            --gray-400: #2e3136;
+            --gray-500: #5c6270;
+            --gray-600: #8a93a3;
+            --gray-700: #c2c8d2;
+            --gray-800: #e6e9ee;
+            --gray-900: #f7f8fa;
+            background-color: var(--gray-50);
+            color: var(--gray-900);
         }
 
         /* Typography Scale */
@@ -231,6 +248,7 @@
             z-index: var(--z-sticky);
             backdrop-filter: blur(10px);
         }
+        body.dark .header { background: var(--gray-100); }
 
         .nav {
             display: flex;
@@ -298,11 +316,58 @@
             border-radius: var(--radius-md);
             cursor: pointer;
             transition: background-color var(--transition-fast);
+                position: relative;
         }
 
         .location-selector:hover {
             background: var(--gray-100);
         }
+
+            /* Location Detector Specific Styles */
+            #location-detector .search-input { 
+                padding: var(--space-3) var(--space-4); 
+                border: 1px solid var(--gray-300);
+                border-radius: var(--radius-md);
+                font-size: var(--text-sm);
+            }
+        
+            #location-detector .search-input:focus {
+                outline: none;
+                border-color: var(--primary-500);
+                box-shadow: 0 0 0 3px rgba(252, 128, 25, 0.1);
+            }
+        
+            #location-suggestions li { 
+                padding: var(--space-3) var(--space-4); 
+                cursor: pointer; 
+                border-bottom: 1px solid var(--gray-100);
+                font-size: var(--text-sm);
+                color: var(--gray-700);
+                transition: all var(--transition-fast);
+            }
+        
+            #location-suggestions li:last-child {
+                border-bottom: none;
+            }
+        
+            #location-suggestions li[aria-selected="true"], 
+            #location-suggestions li:hover { 
+                background: var(--primary-50); 
+                color: var(--primary-700);
+            }
+        
+            #location-controls.hidden { 
+                display: none; 
+            }
+        
+            #use-location-btn {
+                white-space: nowrap;
+            }
+        
+            #use-location-btn.disabled {
+                opacity: 0.6;
+                cursor: not-allowed;
+            }
 
         .user-menu {
             position: relative;
@@ -509,6 +574,7 @@
             position: relative;
             overflow: hidden;
         }
+        body.dark .category-card { background: var(--gray-100); }
 
         .category-card::before {
             content: '';
@@ -592,6 +658,7 @@
             transition: all var(--transition-normal);
             position: relative;
         }
+        body.dark .restaurant-card { background: var(--gray-100); }
 
         .restaurant-card:hover {
             transform: translateY(-4px);
@@ -703,6 +770,39 @@
             background: var(--gray-900);
             color: white;
         }
+        /* Toasts */
+        #toast-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            z-index: 2000;
+        }
+        .toast {
+            padding: 12px 16px;
+            border-radius: 8px;
+            color: white;
+            box-shadow: var(--shadow-lg);
+            animation: fadeIn 0.2s ease-out;
+            font-size: var(--text-sm);
+        }
+        .toast-success { background: #16a34a; }
+        .toast-error { background: #dc2626; }
+        .toast-info { background: #2563eb; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(-6px);} to { opacity: 1; transform: translateY(0);} }
+
+        /* Skeletons */
+        .skeleton-grid { display: grid; gap: var(--space-6); }
+        .skeleton-card { background: var(--gray-100); border-radius: var(--radius-lg); overflow: hidden; box-shadow: var(--shadow-sm); }
+        .skeleton-img { height: 200px; background: linear-gradient(90deg, var(--gray-200), var(--gray-300), var(--gray-200)); background-size: 200% 100%; animation: shimmer 1.2s infinite; }
+        .skeleton-content { padding: var(--space-6); }
+        .skeleton-line { height: 12px; background: var(--gray-200); border-radius: 6px; margin-bottom: 10px; }
+        .skeleton-line.short { width: 40%; }
+        .skeleton-line.medium { width: 70%; }
+        .skeleton-line.long { width: 90%; }
+        @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
 
         .footer-content {
             display: grid;
@@ -871,34 +971,27 @@
                     <i class="fas fa-utensils logo-icon"></i>
                     QuickBite
                 </a>
-<!-- Replace your existing .location-selector with this block -->
 <div id="location-detector" class="location-selector" aria-live="polite">
-  <button id="use-location-btn" class="btn btn-outline" aria-label="Detect my location">
-    <i class="fas fa-map-marker-alt"></i>
-    <span id="location-label">Select location</span>
-  </button>
-
-  <div id="location-controls" class="hidden" style="position:relative;">
-    <input id="location-search" type="search" placeholder="Search for address or city..." aria-label="Search location" class="search-input" />
-    <ul id="location-suggestions" role="listbox" class="hidden" style="position:absolute; z-index:1100; left:0; right:0; background:white; border:1px solid var(--gray-200); border-radius:8px; max-height:240px; overflow:auto; list-style:none; padding:0; margin-top:4px;"></ul>
-    <div id="location-actions" style="margin-top:6px; display:flex; gap:8px;">
-      <button id="use-geo" class="btn btn-primary btn-sm">Use my location</button>
-      <button id="use-ip" class="btn btn-outline btn-sm">Detect by IP</button>
-      <button id="close-location" class="btn btn-sm">Close</button>
-    </div>
-  </div>
+        <button id="use-location-btn" class="btn btn-outline btn-sm" aria-label="Detect my location">
+                <i class="fas fa-map-marker-alt"></i>
+                <span id="location-label">Select location</span>
+        </button>
+        <div id="location-controls" class="hidden" style="position:absolute; top:100%; left:0; right:0; background:white; border:1px solid var(--gray-200); border-radius:var(--radius-lg); padding:var(--space-4); margin-top:var(--space-2); box-shadow:var(--shadow-xl); z-index:var(--z-dropdown); min-width:300px;">
+                <input id="location-search" type="search" placeholder="Search for address or city..." aria-label="Search location" class="search-input" style="width:100%; margin-bottom:var(--space-3);" />
+                <ul id="location-suggestions" role="listbox" class="hidden" style="position:relative; background:white; border:1px solid var(--gray-200); border-radius:var(--radius-md); max-height:240px; overflow:auto; list-style:none; padding:0; margin-bottom:var(--space-3);"></ul>
+                <div id="location-actions" style="display:flex; gap:var(--space-2); flex-wrap:wrap;">
+                        <button id="use-geo" class="btn btn-primary btn-sm" style="flex:1;">
+                                <i class="fas fa-crosshairs"></i> Use GPS
+                        </button>
+                        <button id="use-ip" class="btn btn-outline btn-sm" style="flex:1;">
+                                <i class="fas fa-wifi"></i> Detect IP
+                        </button>
+                        <button id="close-location" class="btn btn-sm" style="flex:1;">
+                                <i class="fas fa-times"></i> Close
+                        </button>
+                </div>
+        </div>
 </div>
-
-<!-- Add small component styles (you can move to your CSS file) -->
-<style>
-  #location-detector .search-input { padding: 8px 12px; }
-  #location-suggestions li { padding:8px 12px; cursor:pointer; border-bottom:1px solid var(--gray-100); }
-  #location-suggestions li[aria-selected="true"], #location-suggestions li:hover { background:var(--primary-50); color:var(--primary-700); }
-  #location-controls.hidden { display:none; }
-</style>
-
-<!-- Include the JS file at the end of body (adjust path if necessary) -->
-<script src="./location-detector.js"></script>
 
                 <div class="nav-search desktop-only">
                     <i class="fas fa-search search-icon"></i>
@@ -906,6 +999,7 @@
                 </div>
 
                 <div class="nav-actions">
+                    <button id="theme-toggle" class="btn btn-outline desktop-only" title="Toggle dark mode"><i class="fas fa-moon"></i></button>
                     <button class="btn btn-outline desktop-only">Offers</button>
                     <button class="btn btn-outline desktop-only">Help</button>
                     
@@ -1035,6 +1129,7 @@
                     <button class="filter-btn active">All</button>
                     <button class="filter-btn">Fast Delivery</button>
                     <button class="filter-btn">Rating 4.0+</button>
+                    <button class="filter-btn" data-filter="favorites">Favorites</button>
                     <button class="filter-btn">Pure Veg</button>
                     <button class="filter-btn">Offers</button>
                 </div>
@@ -1151,320 +1246,24 @@
         </a>
     </nav>
 
-    <script>
-        // Enterprise-Level Application State Management
-        class QuickBiteApp {
-            constructor() {
-                this.state = {
-                    user: null,
-                    cart: [],
-                    restaurants: [],
-                    filters: {
-                        category: 'all',
-                        rating: 0,
-                        deliveryTime: 0,
-                        sortBy: 'rating'
-                    },
-                    location: null,
-                    isLoading: false
-                };
+    <!-- Toast container -->
+    <div id="toast-container" aria-live="polite" aria-atomic="true"></div>
 
-                this.init();
-            }
-
-            async init() {
-                // Initialize application
-                await this.loadUserData();
-                await this.loadRestaurants();
-                this.setupEventListeners();
-                this.updateUI();
-            }
-
-            async loadUserData() {
-                // Simulate API call to load user data
-                try {
-                    // In production, this would be a real API call
-                    const userData = localStorage.getItem('quickbite_user');
-                    if (userData) {
-                        this.state.user = JSON.parse(userData);
-                    } else {
-                        // Demo user for initial load
-                        this.state.user = {
-                            id: 'user_12345',
-                            name: 'Demo User',
-                            email: 'user@quickbite.com',
-                            phone: '+919876543210',
-                            avatar: 'DU',
-                            addresses: [],
-                            preferences: {}
-                        };
-                    }
-                } catch (error) {
-                    console.error('Failed to load user data:', error);
-                    // Fallback to demo user
-                    this.state.user = {
-                        id: 'user_demo',
-                        name: 'Demo User',
-                        email: 'demo@quickbite.com',
-                        phone: '+910000000000',
-                        avatar: 'DU'
-                    };
+    <!-- Main Application Logic (API Integration) -->
+    <script src="./app.js"></script>
+    
+            <!-- Location Detector Component -->
+        <script src="./location-detector.js"></script>
+            <script>
+                // Theme persistence
+                (function(){
+                    const theme = localStorage.getItem('quickbite_theme') || 'light';
+                    if (theme === 'dark') document.body.classList.add('dark');
+                })();
+                // Register service worker for PWA/offline
+                if ('serviceWorker' in navigator) {
+                    navigator.serviceWorker.register('./sw.js').catch(() => {});
                 }
-            }
-
-            async loadRestaurants() {
-                this.state.isLoading = true;
-                
-                try {
-                    // Simulate API call with realistic restaurant data
-                    const mockRestaurants = this.generateMockRestaurants(12);
-                    
-                    // Simulate network delay
-                    await new Promise(resolve => setTimeout(resolve, 500));
-                    
-                    this.state.restaurants = mockRestaurants;
-                } catch (error) {
-                    console.error('Failed to load restaurants:', error);
-                    // Fallback to empty array
-                    this.state.restaurants = [];
-                } finally {
-                    this.state.isLoading = false;
-                }
-            }
-
-            generateMockRestaurants(count) {
-                const cuisines = [
-                    'North Indian', 'Chinese', 'Italian', 'Mexican', 'Thai', 
-                    'Japanese', 'American', 'Mediterranean', 'South Indian', 'Continental'
-                ];
-                
-                const names = [
-                    'Spice Garden', 'Burger Hub', 'Pizza Palace', 'Sushi Express', 
-                    'Tandoori Nights', 'Noodle Bar', 'Curry House', 'BBQ Nation',
-                    'Fresh Greens', 'Deli Corner', 'Cafe Mocha', 'Dessert Paradise'
-                ];
-                
-                return Array.from({ length: count }, (_, index) => ({
-                    id: `restaurant_${index + 1}`,
-                    name: names[index % names.length],
-                    image: `https://images.unsplash.com/photo-15${index % 10}7248135467-4c7edcad34c4?w=400&h=300&fit=crop`,
-                    rating: (4 + Math.random()).toFixed(1),
-                    cuisine: cuisines.slice(0, 2 + Math.floor(Math.random() * 3)).join(', '),
-                    deliveryTime: `${15 + Math.floor(Math.random() * 30)}-${25 + Math.floor(Math.random() * 30)} mins`,
-                    price: `₹${200 + Math.floor(Math.random() * 800)} for two`,
-                    isPromoted: Math.random() > 0.7,
-                    offer: Math.random() > 0.5 ? `${Math.floor(10 + Math.random() * 50)}% OFF` : null,
-                    distance: (1 + Math.random() * 5).toFixed(1)
-                }));
-            }
-
-            setupEventListeners() {
-                // Filter buttons
-                document.querySelectorAll('.filter-btn').forEach(btn => {
-                    btn.addEventListener('click', (e) => {
-                        document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
-                        e.target.classList.add('active');
-                        this.applyFilters(e.target.textContent.toLowerCase());
-                    });
-                });
-
-                // Search functionality
-                const searchInput = document.querySelector('.search-input');
-                if (searchInput) {
-                    searchInput.addEventListener('input', this.debounce(this.handleSearch.bind(this), 300));
-                }
-
-                // Location selector
-                const locationSelector = document.querySelector('.location-selector');
-                if (locationSelector) {
-                    //locationSelector.addEventListener('click', this.handleLocationSelect.bind(this));
-                }
-
-                // Category cards
-                document.querySelectorAll('.category-card').forEach(card => {
-                    card.addEventListener('click', (e) => {
-                        const category = e.currentTarget.querySelector('.category-name').textContent;
-                        this.filterByCategory(category);
-                    });
-                });
-            }
-
-            debounce(func, wait) {
-                let timeout;
-                return function executedFunction(...args) {
-                    const later = () => {
-                        clearTimeout(timeout);
-                        func(...args);
-                    };
-                    clearTimeout(timeout);
-                    timeout = setTimeout(later, wait);
-                };
-            }
-
-            handleSearch(event) {
-                const query = event.target.value.toLowerCase();
-                const filtered = this.state.restaurants.filter(restaurant => 
-                    restaurant.name.toLowerCase().includes(query) ||
-                    restaurant.cuisine.toLowerCase().includes(query)
-                );
-                this.renderRestaurants(filtered);
-            }
-
-            handleLocationSelect() {
-                // In production, this would integrate with Google Maps API
-                alert('Location selection modal would open here with map integration');
-            }
-
-            applyFilters(filterType) {
-                let filtered = [...this.state.restaurants];
-                
-                switch(filterType) {
-                    case 'fast delivery':
-                        filtered = filtered.filter(r => parseInt(r.deliveryTime) <= 30);
-                        break;
-                    case 'rating 4.0+':
-                        filtered = filtered.filter(r => parseFloat(r.rating) >= 4.0);
-                        break;
-                    case 'pure veg':
-                        // This would require restaurant metadata
-                        break;
-                    case 'offers':
-                        filtered = filtered.filter(r => r.offer);
-                        break;
-                }
-                
-                this.renderRestaurants(filtered);
-            }
-
-            filterByCategory(category) {
-                // In production, this would filter by actual cuisine categories
-                const filtered = this.state.restaurants.filter(restaurant => 
-                    restaurant.cuisine.toLowerCase().includes(category.toLowerCase())
-                );
-                this.renderRestaurants(filtered);
-            }
-
-            renderRestaurants(restaurants = this.state.restaurants) {
-                const grid = document.getElementById('restaurant-grid');
-                if (!grid) return;
-
-                grid.innerHTML = restaurants.map(restaurant => `
-                    <div class="restaurant-card" data-id="${restaurant.id}">
-                        ${restaurant.offer ? `<div class="card-badge">${restaurant.offer}</div>` : ''}
-                        <img src="${restaurant.image}" alt="${restaurant.name}" class="card-image" loading="lazy">
-                        <div class="card-content">
-                            <div class="card-header">
-                                <h3 class="restaurant-name">${restaurant.name}</h3>
-                                <div class="rating">⭐ ${restaurant.rating}</div>
-                            </div>
-                            <p class="cuisine">${restaurant.cuisine}</p>
-                            <div class="delivery-info">
-                                <span>${restaurant.deliveryTime}</span>
-                                <span>${restaurant.price}</span>
-                            </div>
-                        </div>
-                    </div>
-                `).join('');
-
-                // Add click handlers for restaurant cards
-                grid.querySelectorAll('.restaurant-card').forEach(card => {
-                    card.addEventListener('click', () => {
-                        const restaurantId = card.dataset.id;
-                        this.viewRestaurant(restaurantId);
-                    });
-                });
-            }
-
-            viewRestaurant(restaurantId) {
-                // In production, this would navigate to restaurant detail page
-                const restaurant = this.state.restaurants.find(r => r.id === restaurantId);
-                if (restaurant) {
-                    alert(`Restaurant Detail View:\n\nName: ${restaurant.name}\nRating: ${restaurant.rating}\nCuisine: ${restaurant.cuisine}\nDelivery Time: ${restaurant.deliveryTime}\n\nThis would open a full restaurant detail page with menu.`);
-                }
-            }
-
-            updateUI() {
-                // Update user avatar
-                const userAvatar = document.querySelector('.user-avatar');
-                if (userAvatar && this.state.user) {
-                    userAvatar.textContent = this.state.user.avatar;
-                }
-
-                // Render restaurants
-                this.renderRestaurants();
-            }
-        }
-
-        // Performance Monitoring
-        class PerformanceMonitor {
-            constructor() {
-                this.metrics = {
-                    pageLoad: 0,
-                    apiCalls: 0,
-                    errors: 0
-                };
-                
-                this.startTime = performance.now();
-                this.setupMonitoring();
-            }
-
-            setupMonitoring() {
-                // Monitor page load performance
-                window.addEventListener('load', () => {
-                    this.metrics.pageLoad = performance.now() - this.startTime;
-                    this.reportMetrics();
-                });
-
-                // Monitor errors
-                window.addEventListener('error', (e) => {
-                    this.metrics.errors++;
-                    this.reportError(e.error);
-                });
-
-                // Monitor unhandled promise rejections
-                window.addEventListener('unhandledrejection', (e) => {
-                    this.metrics.errors++;
-                    this.reportError(e.reason);
-                });
-            }
-
-            reportMetrics() {
-                // In production, this would send to analytics service
-                console.log('Performance Metrics:', this.metrics);
-            }
-
-            reportError(error) {
-                // In production, this would send to error tracking service
-                console.error('Application Error:', error);
-            }
-        }
-
-        // Initialize application when DOM is loaded
-        document.addEventListener('DOMContentLoaded', () => {
-            // Initialize performance monitoring
-            const monitor = new PerformanceMonitor();
-            
-            // Initialize main application
-            const app = new QuickBiteApp();
-            
-            // Make app globally available for debugging
-            window.QuickBite = app;
-            
-            console.log('QuickBite Platform initialized successfully');
-        });
-
-        // Service Worker Registration for PWA capabilities
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register('/sw.js')
-                    .then(registration => {
-                        console.log('SW registered: ', registration);
-                    })
-                    .catch(registrationError => {
-                        console.log('SW registration failed: ', registrationError);
-                    });
-            });
-        }
-    </script>
+            </script>
 </body>
 </html>

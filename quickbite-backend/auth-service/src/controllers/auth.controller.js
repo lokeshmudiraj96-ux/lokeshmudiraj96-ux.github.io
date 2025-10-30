@@ -3,6 +3,11 @@ const OTP = require('../models/otp.model');
 const RefreshToken = require('../models/refreshToken.model');
 const TokenService = require('../services/token.service');
 const { sendOTP } = require('../utils/sms.util');
+const { getRedisClient } = require('../config/redis');
+
+function isValidE164(phone) {
+  return typeof phone === 'string' && /^\+[1-9]\d{1,14}$/.test(phone);
+}
 
 class AuthController {
   // Request OTP for login/registration
@@ -10,31 +15,44 @@ class AuthController {
     try {
       const { phone, purpose = 'login' } = req.body;
 
-      if (!phone) {
+      if (!phone || !isValidE164(phone)) {
         return res.status(400).json({ 
           success: false, 
-          message: 'Phone number is required' 
+          message: 'Invalid phone number format',
+          code: 'INVALID_PHONE'
         });
       }
 
       // Check if user exists
       const user = await User.findByPhone(phone);
       
-      if (purpose === 'login' && !user) {
-        return res.status(404).json({ 
-          success: false, 
-          message: 'User not found. Please register first.' 
-        });
+        // Allow OTP for both existing and new users (auto-register on verify)
+        console.log(`📱 OTP requested for ${phone} (${user ? 'existing' : 'new'} user)`);
+
+      // Rate limiting: max 5 per hour per phone (best-effort; skip if Redis unavailable)
+      try {
+        const redis = getRedisClient();
+        const bucket = new Date();
+        const hourKey = `${bucket.getUTCFullYear()}${String(bucket.getUTCMonth()+1).padStart(2,'0')}${String(bucket.getUTCDate()).padStart(2,'0')}${String(bucket.getUTCHours()).padStart(2,'0')}`;
+        const rlKey = `otp:rl:${phone}:${hourKey}`;
+        const count = await redis.incr(rlKey);
+        if (count === 1) {
+          // set TTL to the remaining seconds in the current hour
+          const secondsRemaining = 3600 - (bucket.getUTCMinutes()*60 + bucket.getUTCSeconds());
+          await redis.expire(rlKey, Math.max(1, secondsRemaining));
+        }
+        if (count > 5) {
+          return res.status(429).json({
+            success: false,
+            message: 'Rate limit exceeded',
+            code: 'RATE_LIMIT_EXCEEDED'
+          });
+        }
+      } catch (e) {
+        console.warn('⚠️ Redis unavailable, skipping OTP rate limiting');
       }
 
-      if (purpose === 'registration' && user) {
-        return res.status(400).json({ 
-          success: false, 
-          message: 'Phone number already registered' 
-        });
-      }
-
-      // Generate OTP
+      // Generate OTP (5 min TTL handled in model)
       const otpData = await OTP.create(phone, purpose);
 
       // Send OTP via SMS (implement this based on your SMS provider)
@@ -42,6 +60,7 @@ class AuthController {
 
       res.status(200).json({
         success: true,
+        status: 'OTP_SENT',
         message: 'OTP sent successfully',
         expiresAt: otpData.expires_at
       });
@@ -63,13 +82,12 @@ class AuthController {
       }
 
       // Verify OTP
-      const isValid = await OTP.verify(phone, otp, purpose);
-
-      if (!isValid) {
-        return res.status(400).json({ 
-          success: false, 
-          message: 'Invalid or expired OTP' 
-        });
+      const result = await OTP.verify(phone, otp, purpose);
+      if (result.status === 'EXPIRED') {
+        return res.status(400).json({ success: false, message: 'OTP expired', code: 'OTP_EXPIRED' });
+      }
+      if (result.status !== 'VALID') {
+        return res.status(400).json({ success: false, message: 'Invalid OTP', code: 'OTP_INVALID' });
       }
 
       let user;
@@ -97,10 +115,21 @@ class AuthController {
         user = await User.findByPhone(phone);
         
         if (!user) {
-          return res.status(404).json({ 
-            success: false, 
-            message: 'User not found' 
-          });
+            // Auto-register new user on first OTP login
+            console.log(`🆕 Auto-registering new user: ${phone}`);
+            user = await User.create({
+              name: name || `User ${phone.slice(-4)}`,
+              email: email || null,
+              phone,
+              password: Math.random().toString(36).slice(-8),
+              role: 'customer'
+            });
+          
+            if (user.id && typeof User.markAsVerified === 'function') {
+              await User.markAsVerified(user.id);
+            } else {
+              user.is_verified = true;
+            }
         }
       }
 
@@ -118,7 +147,8 @@ class AuthController {
           role: user.role,
           isVerified: user.is_verified
         },
-        tokens
+        tokens,
+        token_type: 'Bearer'
       });
     } catch (error) {
       next(error);
@@ -307,6 +337,21 @@ class AuthController {
       });
     } catch (error) {
       next(error);
+    }
+  }
+
+  // Token introspection (LLR-AUTH-003)
+  async introspect(req, res) {
+    const { token } = req.body || {};
+    if (!token || typeof token !== 'string') {
+      return res.status(400).json({ success: false, message: 'Token is required', code: 'TOKEN_MALFORMED' });
+    }
+    try {
+      const decoded = TokenService.verifyAccessToken(token);
+      return res.status(200).json({ active: true, user_id: decoded.id });
+    } catch (e) {
+      // Invalid or expired
+      return res.status(200).json({ active: false });
     }
   }
 }

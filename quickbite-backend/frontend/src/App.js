@@ -4,6 +4,8 @@ import { ThemeProvider, createTheme } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import { AuthProvider } from './context/AuthContext';
 import { CartProvider } from './context/CartContext';
+import { OrdersProvider } from './context/OrdersContext';
+import { LocationProvider } from './context/LocationContext';
 import PrivateRoute from './components/PrivateRoute';
 import LandingPage from './components/LandingPage';
 import Login from './components/Login';
@@ -33,7 +35,9 @@ function App() {
       <CssBaseline />
       <AuthProvider>
         <CartProvider>
-          <Router>
+          <OrdersProvider>
+            <LocationProvider>
+              <Router>
             <NavBar />
             <Routes>
             {/* Public Routes */}
@@ -76,9 +80,11 @@ function App() {
                 </PrivateRoute>
               } 
             />
-            </Routes>
-            <Footer />
-          </Router>
+                </Routes>
+                <Footer />
+              </Router>
+            </LocationProvider>
+          </OrdersProvider>
         </CartProvider>
       </AuthProvider>
     </ThemeProvider>

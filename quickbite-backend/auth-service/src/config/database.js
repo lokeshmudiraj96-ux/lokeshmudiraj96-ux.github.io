@@ -24,6 +24,12 @@ const connectDB = async () => {
       return pool;
     }
     
+    // Skip DB connection if DATABASE_URL not configured (dev mode)
+    if (!process.env.DATABASE_URL) {
+      console.log('⚠️ DATABASE_URL not set - running without database (in-memory mode for dev)');
+      return null;
+    }
+    
     pool = await sql.connect(config);
     console.log('✅ SQL Server connected');
     
@@ -34,15 +40,20 @@ const connectDB = async () => {
     return pool;
   } catch (error) {
     console.error('❌ Database connection failed:', error.message);
-    process.exit(1);
+    if (process.env.NODE_ENV === 'production') {
+      process.exit(1);
+    } else {
+      console.log('⚠️ Continuing without database in dev mode');
+      return null;
+    }
   }
 };
 
 const getPool = () => {
-  if (!pool) {
+  if (!pool && process.env.NODE_ENV === 'production') {
     throw new Error('Database not connected. Call connectDB() first.');
   }
-  return pool;
+  return pool; // Returns null in dev mode if not connected
 };
 
 module.exports = { sql, connectDB, getPool };

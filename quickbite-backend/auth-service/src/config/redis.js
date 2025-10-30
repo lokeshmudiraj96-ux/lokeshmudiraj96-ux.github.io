@@ -3,9 +3,18 @@ const redis = require('redis');
 let redisClient;
 
 const connectRedis = async () => {
+  // Skip Redis if not configured (dev mode)
+  if (!process.env.REDIS_URL) {
+    console.log('⚠️ REDIS_URL not set - rate limiting disabled (dev mode)');
+    return;
+  }
+
   try {
     redisClient = redis.createClient({
-      url: process.env.REDIS_URL || 'redis://localhost:6379'
+      url: process.env.REDIS_URL,
+      socket: {
+        reconnectStrategy: false // Don't spam reconnection attempts
+      }
     });
 
     redisClient.on('error', (err) => console.error('❌ Redis Client Error:', err));

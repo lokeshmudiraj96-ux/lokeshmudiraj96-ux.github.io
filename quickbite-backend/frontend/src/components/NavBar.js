@@ -1,13 +1,15 @@
 import React from 'react';
-import { AppBar, Badge, Box, Button, IconButton, Toolbar, Typography } from '@mui/material';
+import { AppBar, Badge, Box, Button, IconButton, Toolbar, Typography, Chip } from '@mui/material';
 import ShoppingCartIcon from '@mui/icons-material/ShoppingCart';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
+import { useLocationCtx } from '../context/LocationContext';
 
 const NavBar = () => {
   const { isAuthenticated, user, logout } = useAuth();
   const { count } = useCart();
+  const { location, loading, detect } = useLocationCtx();
 
   return (
     <AppBar position="sticky" sx={{ bgcolor: 'white', color: 'black' }}>
@@ -24,6 +26,14 @@ const NavBar = () => {
         <Button component={Link} to="/catalog" sx={{ color: '#424242', mr: 1 }}>
           Browse
         </Button>
+
+        <Chip
+          label={location?.label ? `📍 ${location.label}` : (loading ? 'Detecting…' : 'Detect location')}
+          onClick={!location ? detect : undefined}
+          color={location ? 'success' : 'default'}
+          variant={location ? 'filled' : 'outlined'}
+          sx={{ mr: 2, display: { xs: 'none', sm: 'inline-flex' } }}
+        />
 
         <IconButton component={Link} to="/cart" aria-label="cart">
           <Badge badgeContent={count} color="primary">
