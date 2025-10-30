@@ -1,0 +1,494 @@
+# Multi-service Docker Compose for QuickBite Platform
+# Production-ready configuration with monitoring, logging, and scalability
+
+version: '3.8'
+
+services:
+  # ============================================
+  # INFRASTRUCTURE SERVICES
+  # ============================================
+  
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: quickbite-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: quickbite
+      POSTGRES_USER: ${POSTGRES_USER:-quickbite}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=en_US.UTF-8"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./quickbite-backend/auth-service/database/init:/docker-entrypoint-initdb.d
+    ports:
+      - "5432:5432"
+    networks:
+      - quickbite-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-quickbite} -d quickbite"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: quickbite-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD}
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - quickbite-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # MongoDB for Analytics
+  mongodb:
+    image: mongo:6.0
+    container_name: quickbite-mongodb
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_USER:-quickbite}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD}
+      MONGO_INITDB_DATABASE: quickbite_analytics
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+      - mongodb_config:/data/configdb
+    networks:
+      - quickbite-network
+
+  # Elasticsearch for Search
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.10.0
+    container_name: quickbite-elasticsearch
+    restart: unless-stopped
+    environment:
+      - node.name=quickbite-es
+      - cluster.name=quickbite-cluster
+      - discovery.type=single-node
+      - bootstrap.memory_lock=true
+      - xpack.security.enabled=false
+      - "ES_JAVA_OPTS=-Xms1g -Xmx1g"
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+    ports:
+      - "9200:9200"
+    networks:
+      - quickbite-network
+
+  # RabbitMQ Message Broker
+  rabbitmq:
+    image: rabbitmq:3.12-management-alpine
+    container_name: quickbite-rabbitmq
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-quickbite}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    networks:
+      - quickbite-network
+
+  # ============================================
+  # MICROSERVICES
+  # ============================================
+
+  # API Gateway
+  api-gateway:
+    build:
+      context: ./quickbite-backend/api-gateway
+      dockerfile: Dockerfile
+    container_name: quickbite-api-gateway
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - JWT_SECRET=${JWT_SECRET}
+      - REDIS_URL=redis://redis:6379
+      - AUTH_SERVICE_URL=http://auth-service:3001
+      - CATALOG_SERVICE_URL=http://catalog-service:3002
+      - ORDER_SERVICE_URL=http://order-service:3003
+      - PAYMENT_SERVICE_URL=http://payment-service:3004
+      - DELIVERY_SERVICE_URL=http://delivery-service:3005
+      - NOTIFICATION_SERVICE_URL=http://notification-service:3006
+    ports:
+      - "3000:3000"
+    depends_on:
+      - redis
+      - auth-service
+      - catalog-service
+    networks:
+      - quickbite-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Authentication Service
+  auth-service:
+    build:
+      context: ./quickbite-backend/auth-service
+      dockerfile: Dockerfile
+    container_name: quickbite-auth-service
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+      - PORT=3001
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-quickbite}:${POSTGRES_PASSWORD}@postgres:5432/quickbite
+      - REDIS_URL=redis://redis:6379
+      - JWT_SECRET=${JWT_SECRET}
+      - JWT_REFRESH_SECRET=${JWT_REFRESH_SECRET}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
+      - TWILIO_SID=${TWILIO_SID}
+      - TWILIO_TOKEN=${TWILIO_TOKEN}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - quickbite-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Catalog Service
+  catalog-service:
+    build:
+      context: ./quickbite-backend/catalog-service
+      dockerfile: Dockerfile
+    container_name: quickbite-catalog-service
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+      - PORT=3002
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-quickbite}:${POSTGRES_PASSWORD}@postgres:5432/quickbite
+      - REDIS_URL=redis://redis:6379
+      - ELASTICSEARCH_URL=http://elasticsearch:9200
+      - RABBITMQ_URL=amqp://${RABBITMQ_USER:-quickbite}:${RABBITMQ_PASSWORD}@rabbitmq:5672
+    depends_on:
+      - postgres
+      - redis
+      - elasticsearch
+      - rabbitmq
+    networks:
+      - quickbite-network
+
+  # Order Service
+  order-service:
+    build:
+      context: ./quickbite-backend/order-service
+      dockerfile: Dockerfile
+    container_name: quickbite-order-service
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+      - PORT=3003
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-quickbite}:${POSTGRES_PASSWORD}@postgres:5432/quickbite
+      - REDIS_URL=redis://redis:6379
+      - RABBITMQ_URL=amqp://${RABBITMQ_USER:-quickbite}:${RABBITMQ_PASSWORD}@rabbitmq:5672
+      - PAYMENT_SERVICE_URL=http://payment-service:3004
+      - DELIVERY_SERVICE_URL=http://delivery-service:3005
+      - NOTIFICATION_SERVICE_URL=http://notification-service:3006
+    depends_on:
+      - postgres
+      - redis
+      - rabbitmq
+    networks:
+      - quickbite-network
+
+  # Payment Service
+  payment-service:
+    build:
+      context: ./quickbite-backend/payment-service
+      dockerfile: Dockerfile
+    container_name: quickbite-payment-service
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+      - PORT=3004
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-quickbite}:${POSTGRES_PASSWORD}@postgres:5432/quickbite
+      - REDIS_URL=redis://redis:6379
+      - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
+      - RAZORPAY_KEY_ID=${RAZORPAY_KEY_ID}
+      - RAZORPAY_KEY_SECRET=${RAZORPAY_KEY_SECRET}
+      - PAYPAL_CLIENT_ID=${PAYPAL_CLIENT_ID}
+      - PAYPAL_CLIENT_SECRET=${PAYPAL_CLIENT_SECRET}
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - quickbite-network
+
+  # Delivery Service
+  delivery-service:
+    build:
+      context: ./quickbite-backend/delivery-service
+      dockerfile: Dockerfile
+    container_name: quickbite-delivery-service
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+      - PORT=3005
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-quickbite}:${POSTGRES_PASSWORD}@postgres:5432/quickbite
+      - REDIS_URL=redis://redis:6379
+      - RABBITMQ_URL=amqp://${RABBITMQ_USER:-quickbite}:${RABBITMQ_PASSWORD}@rabbitmq:5672
+      - GOOGLE_MAPS_API_KEY=${GOOGLE_MAPS_API_KEY}
+    depends_on:
+      - postgres
+      - redis
+      - rabbitmq
+    networks:
+      - quickbite-network
+
+  # Notification Service
+  notification-service:
+    build:
+      context: ./quickbite-backend/notification-service
+      dockerfile: Dockerfile
+    container_name: quickbite-notification-service
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+      - PORT=3006
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-quickbite}:${POSTGRES_PASSWORD}@postgres:5432/quickbite
+      - REDIS_URL=redis://redis:6379
+      - RABBITMQ_URL=amqp://${RABBITMQ_USER:-quickbite}:${RABBITMQ_PASSWORD}@rabbitmq:5672
+      - FIREBASE_SERVICE_ACCOUNT=${FIREBASE_SERVICE_ACCOUNT}
+      - TWILIO_SID=${TWILIO_SID}
+      - TWILIO_TOKEN=${TWILIO_TOKEN}
+      - SENDGRID_API_KEY=${SENDGRID_API_KEY}
+    depends_on:
+      - postgres
+      - redis
+      - rabbitmq
+    networks:
+      - quickbite-network
+
+  # ============================================
+  # FRONTEND APPLICATIONS
+  # ============================================
+
+  # Customer Web App
+  customer-web:
+    build:
+      context: ./quickbite-backend/frontend
+      dockerfile: Dockerfile
+      target: production
+    container_name: quickbite-customer-web
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+      - NEXT_PUBLIC_API_URL=http://api-gateway:3000
+      - NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=${GOOGLE_MAPS_API_KEY}
+      - NEXT_PUBLIC_STRIPE_PUBLIC_KEY=${STRIPE_PUBLIC_KEY}
+    ports:
+      - "3100:3000"
+    depends_on:
+      - api-gateway
+    networks:
+      - quickbite-network
+
+  # Restaurant Dashboard
+  restaurant-dashboard:
+    build:
+      context: ./restaurant-dashboard
+      dockerfile: Dockerfile
+      target: production
+    container_name: quickbite-restaurant-dashboard
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+      - REACT_APP_API_URL=http://api-gateway:3000
+    ports:
+      - "3200:80"
+    depends_on:
+      - api-gateway
+    networks:
+      - quickbite-network
+
+  # Admin Dashboard
+  admin-dashboard:
+    build:
+      context: ./admin-dashboard
+      dockerfile: Dockerfile
+      target: production
+    container_name: quickbite-admin-dashboard
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+      - REACT_APP_API_URL=http://api-gateway:3000
+      - REACT_APP_MONGODB_URL=mongodb://${MONGO_USER:-quickbite}:${MONGO_PASSWORD}@mongodb:27017/quickbite_analytics
+    ports:
+      - "3300:80"
+    depends_on:
+      - api-gateway
+      - mongodb
+    networks:
+      - quickbite-network
+
+  # ============================================
+  # MONITORING & LOGGING
+  # ============================================
+
+  # Prometheus Monitoring
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: quickbite-prometheus
+    restart: unless-stopped
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./infra/monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    networks:
+      - quickbite-network
+
+  # Grafana Dashboard
+  grafana:
+    image: grafana/grafana:latest
+    container_name: quickbite-grafana
+    restart: unless-stopped
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-admin}
+      - GF_INSTALL_PLUGINS=grafana-clock-panel,grafana-simple-json-datasource
+    ports:
+      - "3400:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./infra/monitoring/grafana/provisioning:/etc/grafana/provisioning
+    depends_on:
+      - prometheus
+    networks:
+      - quickbite-network
+
+  # ELK Stack for Logging
+  elasticsearch-logs:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.10.0
+    container_name: quickbite-elasticsearch-logs
+    restart: unless-stopped
+    environment:
+      - node.name=quickbite-logs-es
+      - cluster.name=quickbite-logs-cluster
+      - discovery.type=single-node
+      - bootstrap.memory_lock=true
+      - xpack.security.enabled=false
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    volumes:
+      - elasticsearch_logs_data:/usr/share/elasticsearch/data
+    ports:
+      - "9201:9200"
+    networks:
+      - quickbite-network
+
+  # Logstash
+  logstash:
+    image: docker.elastic.co/logstash/logstash:8.10.0
+    container_name: quickbite-logstash
+    restart: unless-stopped
+    volumes:
+      - ./infra/logging/logstash.conf:/usr/share/logstash/pipeline/logstash.conf
+    depends_on:
+      - elasticsearch-logs
+    networks:
+      - quickbite-network
+
+  # Kibana
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.10.0
+    container_name: quickbite-kibana
+    restart: unless-stopped
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch-logs:9200
+    ports:
+      - "5601:5601"
+    depends_on:
+      - elasticsearch-logs
+    networks:
+      - quickbite-network
+
+  # ============================================
+  # LOAD BALANCER & REVERSE PROXY
+  # ============================================
+
+  # Nginx Load Balancer
+  nginx:
+    image: nginx:alpine
+    container_name: quickbite-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./infra/nginx/nginx.conf:/etc/nginx/nginx.conf
+      - ./infra/nginx/sites-available:/etc/nginx/sites-available
+      - ./infra/ssl:/etc/nginx/ssl
+      - nginx_logs:/var/log/nginx
+    depends_on:
+      - api-gateway
+      - customer-web
+      - restaurant-dashboard
+      - admin-dashboard
+    networks:
+      - quickbite-network
+
+# ============================================
+# NETWORKS & VOLUMES
+# ============================================
+
+networks:
+  quickbite-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  mongodb_data:
+    driver: local
+  mongodb_config:
+    driver: local
+  elasticsearch_data:
+    driver: local
+  elasticsearch_logs_data:
+    driver: local
+  rabbitmq_data:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local
+  nginx_logs:
+    driver: local

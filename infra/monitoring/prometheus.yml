@@ -1,0 +1,575 @@
+# QuickBite Platform - Production Monitoring Stack
+# Comprehensive observability with Prometheus, Grafana, ELK, and custom dashboards
+
+# ============================================
+# PROMETHEUS CONFIGURATION
+# ============================================
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: 'quickbite-production'
+    environment: 'production'
+
+rule_files:
+  - "quickbite-alerts.yml"
+  - "infrastructure-alerts.yml"
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+          - alertmanager:9093
+
+scrape_configs:
+  # Prometheus self-monitoring
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+  
+  # Node Exporter for system metrics
+  - job_name: 'node-exporter'
+    kubernetes_sd_configs:
+      - role: endpoints
+    relabel_configs:
+      - source_labels: [__meta_kubernetes_endpoints_name]
+        regex: 'node-exporter'
+        action: keep
+  
+  # Kubernetes API Server
+  - job_name: 'kubernetes-apiservers'
+    kubernetes_sd_configs:
+      - role: endpoints
+    scheme: https
+    tls_config:
+      ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+    bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+    relabel_configs:
+      - source_labels: [__meta_kubernetes_namespace, __meta_kubernetes_service_name, __meta_kubernetes_endpoint_port_name]
+        action: keep
+        regex: default;kubernetes;https
+  
+  # Kubernetes Nodes
+  - job_name: 'kubernetes-nodes'
+    kubernetes_sd_configs:
+      - role: node
+    scheme: https
+    tls_config:
+      ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+    bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+    relabel_configs:
+      - action: labelmap
+        regex: __meta_kubernetes_node_label_(.+)
+      - target_label: __address__
+        replacement: kubernetes.default.svc:443
+      - source_labels: [__meta_kubernetes_node_name]
+        regex: (.+)
+        target_label: __metrics_path__
+        replacement: /api/v1/nodes/${1}/proxy/metrics
+  
+  # Kubernetes Pods
+  - job_name: 'kubernetes-pods'
+    kubernetes_sd_configs:
+      - role: pod
+    relabel_configs:
+      - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+        action: keep
+        regex: true
+      - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_path]
+        action: replace
+        target_label: __metrics_path__
+        regex: (.+)
+      - source_labels: [__address__, __meta_kubernetes_pod_annotation_prometheus_io_port]
+        action: replace
+        regex: ([^:]+)(?::\d+)?;(\d+)
+        replacement: $1:$2
+        target_label: __address__
+      - action: labelmap
+        regex: __meta_kubernetes_pod_label_(.+)
+      - source_labels: [__meta_kubernetes_namespace]
+        action: replace
+        target_label: kubernetes_namespace
+      - source_labels: [__meta_kubernetes_pod_name]
+        action: replace
+        target_label: kubernetes_pod_name
+  
+  # QuickBite API Gateway
+  - job_name: 'quickbite-api-gateway'
+    kubernetes_sd_configs:
+      - role: endpoints
+        namespaces:
+          names:
+            - quickbite
+    relabel_configs:
+      - source_labels: [__meta_kubernetes_service_name]
+        regex: 'api-gateway-service'
+        action: keep
+      - source_labels: [__meta_kubernetes_endpoint_port_name]
+        regex: 'metrics'
+        action: keep
+    metrics_path: /metrics
+    scrape_interval: 10s
+  
+  # QuickBite Microservices
+  - job_name: 'quickbite-microservices'
+    kubernetes_sd_configs:
+      - role: endpoints
+        namespaces:
+          names:
+            - quickbite
+    relabel_configs:
+      - source_labels: [__meta_kubernetes_service_name]
+        regex: '(auth-service|catalog-service|order-service|payment-service|delivery-service|notification-service)'
+        action: keep
+      - source_labels: [__meta_kubernetes_endpoint_port_name]
+        regex: 'metrics'
+        action: keep
+      - source_labels: [__meta_kubernetes_service_name]
+        target_label: service
+    metrics_path: /metrics
+    scrape_interval: 15s
+  
+  # PostgreSQL Exporter
+  - job_name: 'postgres-exporter'
+    static_configs:
+      - targets: ['postgres-exporter:9187']
+    scrape_interval: 30s
+  
+  # Redis Exporter
+  - job_name: 'redis-exporter'
+    static_configs:
+      - targets: ['redis-exporter:9121']
+    scrape_interval: 30s
+  
+  # MongoDB Exporter
+  - job_name: 'mongodb-exporter'
+    static_configs:
+      - targets: ['mongodb-exporter:9216']
+    scrape_interval: 30s
+  
+  # Elasticsearch Exporter
+  - job_name: 'elasticsearch-exporter'
+    static_configs:
+      - targets: ['elasticsearch-exporter:9114']
+    scrape_interval: 30s
+  
+  # RabbitMQ Exporter
+  - job_name: 'rabbitmq-exporter'
+    static_configs:
+      - targets: ['rabbitmq-exporter:9419']
+    scrape_interval: 30s
+  
+  # Nginx Ingress Controller
+  - job_name: 'nginx-ingress'
+    kubernetes_sd_configs:
+      - role: pod
+        namespaces:
+          names:
+            - ingress-nginx
+    relabel_configs:
+      - source_labels: [__meta_kubernetes_pod_label_app_kubernetes_io_name]
+        regex: 'ingress-nginx'
+        action: keep
+      - source_labels: [__meta_kubernetes_pod_container_port_number]
+        regex: '10254'
+        action: keep
+    metrics_path: /metrics
+  
+  # Blackbox Exporter for external monitoring
+  - job_name: 'blackbox'
+    metrics_path: /probe
+    params:
+      module: [http_2xx]
+    static_configs:
+      - targets:
+        - https://api.quickbite.com/health
+        - https://app.quickbite.com
+        - https://restaurant.quickbite.com
+        - https://admin.quickbite.com
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: blackbox-exporter:9115
+
+# ============================================
+# ALERTING RULES
+# ============================================
+
+# Save as quickbite-alerts.yml
+groups:
+  - name: quickbite.rules
+    rules:
+    
+    # High Error Rate
+    - alert: HighErrorRate
+      expr: rate(http_requests_total{status=~"5.."}[5m]) > 0.1
+      for: 5m
+      labels:
+        severity: critical
+        service: "{{ $labels.service }}"
+      annotations:
+        summary: "High error rate detected"
+        description: "Service {{ $labels.service }} has error rate above 10% for more than 5 minutes"
+    
+    # High Response Time
+    - alert: HighResponseTime
+      expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m])) > 1
+      for: 3m
+      labels:
+        severity: warning
+        service: "{{ $labels.service }}"
+      annotations:
+        summary: "High response time detected"
+        description: "95th percentile response time for {{ $labels.service }} is above 1s"
+    
+    # Service Down
+    - alert: ServiceDown
+      expr: up == 0
+      for: 1m
+      labels:
+        severity: critical
+        service: "{{ $labels.job }}"
+      annotations:
+        summary: "Service is down"
+        description: "{{ $labels.job }} has been down for more than 1 minute"
+    
+    # High CPU Usage
+    - alert: HighCPUUsage
+      expr: (100 - (avg by(instance) (irate(node_cpu_seconds_total{mode="idle"}[5m])) * 100)) > 85
+      for: 5m
+      labels:
+        severity: warning
+      annotations:
+        summary: "High CPU usage"
+        description: "CPU usage is above 85% on {{ $labels.instance }}"
+    
+    # High Memory Usage
+    - alert: HighMemoryUsage
+      expr: (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100 > 85
+      for: 5m
+      labels:
+        severity: warning
+      annotations:
+        summary: "High memory usage"
+        description: "Memory usage is above 85% on {{ $labels.instance }}"
+    
+    # Database Connection Pool Exhausted
+    - alert: DatabaseConnectionPoolHigh
+      expr: db_connection_pool_active / db_connection_pool_max > 0.8
+      for: 2m
+      labels:
+        severity: warning
+      annotations:
+        summary: "Database connection pool usage high"
+        description: "Database connection pool usage is above 80%"
+    
+    # Order Processing Delay
+    - alert: OrderProcessingDelay
+      expr: avg_over_time(order_processing_duration_seconds[5m]) > 300
+      for: 3m
+      labels:
+        severity: critical
+      annotations:
+        summary: "Order processing delays"
+        description: "Average order processing time is above 5 minutes"
+    
+    # Payment Failure Rate High
+    - alert: PaymentFailureRateHigh
+      expr: rate(payment_failures_total[5m]) / rate(payment_attempts_total[5m]) > 0.05
+      for: 2m
+      labels:
+        severity: critical
+      annotations:
+        summary: "High payment failure rate"
+        description: "Payment failure rate is above 5%"
+    
+    # Delivery Partner Shortage
+    - alert: DeliveryPartnerShortage
+      expr: available_delivery_partners < 5
+      for: 1m
+      labels:
+        severity: warning
+      annotations:
+        summary: "Low available delivery partners"
+        description: "Only {{ $value }} delivery partners available"
+    
+    # Kubernetes Pod CrashLooping
+    - alert: PodCrashLooping
+      expr: rate(kube_pod_container_status_restarts_total[15m]) > 0
+      for: 5m
+      labels:
+        severity: critical
+      annotations:
+        summary: "Pod crash looping"
+        description: "Pod {{ $labels.pod }} in namespace {{ $labels.namespace }} is crash looping"
+    
+    # Persistent Volume Usage High
+    - alert: PVUsageHigh
+      expr: (kubelet_volume_stats_used_bytes / kubelet_volume_stats_capacity_bytes) * 100 > 85
+      for: 5m
+      labels:
+        severity: warning
+      annotations:
+        summary: "Persistent volume usage high"
+        description: "PV usage is above 85% on {{ $labels.persistentvolumeclaim }}"
+
+# ============================================
+# GRAFANA DASHBOARDS
+# ============================================
+
+# QuickBite Platform Overview Dashboard
+{
+  "dashboard": {
+    "id": null,
+    "title": "QuickBite Platform Overview",
+    "tags": ["quickbite", "overview"],
+    "timezone": "browser",
+    "panels": [
+      {
+        "id": 1,
+        "title": "Request Rate",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "sum(rate(http_requests_total[5m]))",
+            "legendFormat": "Requests/sec"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {"mode": "thresholds"},
+            "unit": "reqps"
+          }
+        }
+      },
+      {
+        "id": 2,
+        "title": "Error Rate",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "sum(rate(http_requests_total{status=~\"5..\"}[5m])) / sum(rate(http_requests_total[5m])) * 100",
+            "legendFormat": "Error %"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {"mode": "thresholds"},
+            "unit": "percent",
+            "thresholds": {
+              "steps": [
+                {"color": "green", "value": 0},
+                {"color": "yellow", "value": 1},
+                {"color": "red", "value": 5}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 3,
+        "title": "Response Time (95th percentile)",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (le, service))",
+            "legendFormat": "{{service}}"
+          }
+        ]
+      },
+      {
+        "id": 4,
+        "title": "Active Users",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "active_users_total",
+            "legendFormat": "Active Users"
+          }
+        ]
+      },
+      {
+        "id": 5,
+        "title": "Orders per Minute",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "rate(orders_total[1m]) * 60",
+            "legendFormat": "Orders/min"
+          }
+        ]
+      },
+      {
+        "id": 6,
+        "title": "Revenue per Hour",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "rate(revenue_total[1h]) * 3600",
+            "legendFormat": "Revenue/hour"
+          }
+        ]
+      }
+    ],
+    "time": {
+      "from": "now-1h",
+      "to": "now"
+    },
+    "refresh": "30s"
+  }
+}
+
+# ============================================
+# LOGGING CONFIGURATION (ELK Stack)
+# ============================================
+
+# Logstash Pipeline Configuration
+input {
+  beats {
+    port => 5044
+  }
+  
+  http {
+    port => 8080
+    codec => json
+  }
+}
+
+filter {
+  if [fields][service] {
+    mutate {
+      add_field => { "service_name" => "%{[fields][service]}" }
+    }
+  }
+  
+  if [fields][environment] {
+    mutate {
+      add_field => { "environment" => "%{[fields][environment]}" }
+    }
+  }
+  
+  # Parse JSON logs
+  if [message] =~ /^{.*}$/ {
+    json {
+      source => "message"
+    }
+  }
+  
+  # Add timestamp
+  if [timestamp] {
+    date {
+      match => [ "timestamp", "ISO8601" ]
+    }
+  }
+  
+  # Grok pattern for structured logs
+  grok {
+    match => { 
+      "message" => "%{TIMESTAMP_ISO8601:timestamp} \[%{LOGLEVEL:level}\] %{GREEDYDATA:log_message}" 
+    }
+  }
+  
+  # Extract error details
+  if [level] == "ERROR" {
+    grok {
+      match => { 
+        "log_message" => "(?<error_type>\w+): (?<error_message>.*)" 
+      }
+    }
+  }
+  
+  # Add geolocation for access logs
+  if [client_ip] {
+    geoip {
+      source => "client_ip"
+      target => "geoip"
+    }
+  }
+}
+
+output {
+  elasticsearch {
+    hosts => ["elasticsearch:9200"]
+    index => "quickbite-logs-%{+YYYY.MM.dd}"
+    template_name => "quickbite"
+    template => "/usr/share/logstash/templates/quickbite-template.json"
+    template_overwrite => true
+  }
+  
+  # Send critical errors to alerting system
+  if [level] == "ERROR" or [level] == "FATAL" {
+    http {
+      url => "http://alertmanager:9093/api/v1/alerts"
+      http_method => "post"
+      format => "json"
+      mapping => {
+        "alerts" => [
+          {
+            "labels" => {
+              "alertname" => "ApplicationError"
+              "service" => "%{service_name}"
+              "severity" => "critical"
+            }
+            "annotations" => {
+              "summary" => "Application error detected"
+              "description" => "%{log_message}"
+            }
+          }
+        ]
+      }
+    }
+  }
+}
+
+# ============================================
+# CUSTOM METRICS COLLECTION
+# ============================================
+
+# Business Metrics for QuickBite Platform
+business_metrics:
+  - name: orders_total
+    help: Total number of orders
+    type: counter
+    labels: [status, restaurant_id, payment_method]
+  
+  - name: revenue_total
+    help: Total revenue in USD
+    type: counter
+    labels: [restaurant_id, payment_method]
+  
+  - name: active_users_total
+    help: Number of active users
+    type: gauge
+    labels: [user_type]
+  
+  - name: delivery_time_seconds
+    help: Time taken for delivery in seconds
+    type: histogram
+    buckets: [300, 600, 900, 1200, 1800, 2700, 3600]
+    labels: [restaurant_id, delivery_partner_id]
+  
+  - name: order_processing_duration_seconds
+    help: Time taken to process an order
+    type: histogram
+    buckets: [1, 5, 10, 30, 60, 120, 300]
+    labels: [restaurant_id]
+  
+  - name: payment_failures_total
+    help: Total payment failures
+    type: counter
+    labels: [payment_method, failure_reason]
+  
+  - name: available_delivery_partners
+    help: Number of available delivery partners
+    type: gauge
+    labels: [zone]
+  
+  - name: restaurant_ratings
+    help: Restaurant ratings
+    type: histogram
+    buckets: [1, 2, 3, 4, 5]
+    labels: [restaurant_id]
