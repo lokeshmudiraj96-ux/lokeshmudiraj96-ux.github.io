@@ -46,6 +46,7 @@ const OrderTracker = ({ orderId, onClose }) => {
   const [order, setOrder] = useState(null);
   const [tracking, setTracking] = useState([]);
   const [driverLocation, setDriverLocation] = useState(null);
+  const [socket, setSocket] = useState(null);
   const [loading, setLoading] = useState(true);
   const [showMap, setShowMap] = useState(false);
 
