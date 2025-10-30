@@ -1,0 +1,88 @@
+{
+  "name": "quickbite-notification-service",
+  "version": "1.0.0",
+  "description": "Advanced notification and communication service for QuickBite food delivery platform with multi-channel support",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "nodemon src/server.js",
+    "test": "jest --coverage",
+    "test:watch": "jest --watch",
+    "lint": "eslint src/",
+    "lint:fix": "eslint src/ --fix",
+    "migrate": "node src/scripts/migrate.js",
+    "seed": "node src/scripts/seed.js"
+  },
+  "keywords": [
+    "notification",
+    "communication", 
+    "push-notifications",
+    "email",
+    "sms",
+    "whatsapp",
+    "real-time",
+    "websocket",
+    "microservice",
+    "quickbite"
+  ],
+  "author": "QuickBite Development Team",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.19.2",
+    "cors": "^2.8.5",
+    "helmet": "^7.1.0",
+    "compression": "^1.7.4",
+    "dotenv": "^16.4.5",
+    "joi": "^17.13.3",
+    "uuid": "^9.0.1",
+    "bcryptjs": "^2.4.3",
+    "jsonwebtoken": "^9.0.2",
+    "express-rate-limit": "^7.1.5",
+    "pg": "^8.12.0",
+    "redis": "^4.6.10",
+    "socket.io": "^4.7.4",
+    "nodemailer": "^6.9.7",
+    "twilio": "^4.19.0",
+    "firebase-admin": "^11.11.1",
+    "web-push": "^3.6.6",
+    "axios": "^1.6.2",
+    "bull": "^4.12.0",
+    "bull-board": "^2.2.2",
+    "handlebars": "^4.7.8",
+    "moment": "^2.29.4",
+    "moment-timezone": "^0.5.43",
+    "cron": "^3.1.6",
+    "winston": "^3.11.0",
+    "winston-daily-rotate-file": "^4.7.1",
+    "sharp": "^0.32.6",
+    "qrcode": "^1.5.3",
+    "node-cron": "^3.0.3",
+    "express-validator": "^7.0.1",
+    "multer": "^1.4.5-lts.1",
+    "lodash": "^4.17.21",
+    "cheerio": "^1.0.0-rc.12",
+    "juice": "^10.0.0",
+    "ejs": "^3.1.9",
+    "mustache": "^4.2.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.0",
+    "jest": "^29.7.0",
+    "supertest": "^6.3.3",
+    "eslint": "^8.55.0",
+    "prettier": "^3.1.0",
+    "@types/node": "^20.10.0"
+  },
+  "engines": {
+    "node": ">=16.0.0",
+    "npm": ">=8.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/quickbite/notification-service.git"
+  },
+  "bugs": {
+    "url": "https://github.com/quickbite/notification-service/issues"
+  },
+  "homepage": "https://github.com/quickbite/notification-service#readme"
+}

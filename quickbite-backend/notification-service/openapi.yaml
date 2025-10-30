@@ -1,0 +1,97 @@
+openapi: 3.0.3
+info:
+  title: QuickBite Notification Service API
+  version: 1.0.0
+servers:
+  - url: http://localhost:3007
+paths:
+  /api/notifications/send:
+    post:
+      summary: Send notification
+      operationId: sendNotification
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NotificationRequest'
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationResponse'
+        '400': { description: Invalid input }
+        '401': { description: Unauthorized }
+        '404': { description: User not found }
+  /api/notifications/status/{notification_id}:
+    get:
+      summary: Get notification status
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: notification_id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationStatusResponse'
+        '401': { description: Unauthorized }
+        '404': { description: Not found }
+  /api/notifications/retry/{notification_id}:
+    post:
+      summary: Retry failed notification
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: notification_id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationResponse'
+        '400': { description: Only FAILED notifications can be retried }
+        '401': { description: Unauthorized }
+        '404': { description: Not found }
+        '500': { description: Retry failed }
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    NotificationRequest:
+      type: object
+      required: [user_id, type, title, message]
+      properties:
+        user_id: { type: string, format: uuid }
+        type: { type: string, enum: [PUSH, EMAIL, SMS] }
+        title: { type: string }
+        message: { type: string }
+        order_id: { type: string, format: uuid }
+        priority: { type: string, enum: [HIGH, MEDIUM, LOW], default: MEDIUM }
+    NotificationResponse:
+      type: object
+      properties:
+        notification_id: { type: string, format: uuid }
+        status: { type: string, enum: [SENT, FAILED] }
+    NotificationStatusResponse:
+      allOf:
+        - $ref: '#/components/schemas/NotificationResponse'
+        - type: object
+          properties:
+            timestamp_sent: { type: string, format: date-time }
