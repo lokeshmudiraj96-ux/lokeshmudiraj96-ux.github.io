@@ -34,6 +34,7 @@ jobs:
         REACT_APP_API_URL: https://lokeshmudiraj96-uxgithubio-production.up.railway.app/api
         REACT_APP_DEMO_MODE: false
         GENERATE_SOURCEMAP: false
+        CI: false
     
     - name: Deploy to GitHub Pages
       uses: peaceiris/actions-gh-pages@v3

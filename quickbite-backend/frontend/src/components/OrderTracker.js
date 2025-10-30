@@ -17,8 +17,7 @@ import {
   LinearProgress,
   Alert,
   Divider,
-  IconButton,
-  Badge
+  IconButton
 } from '@mui/material';
 import {
   ShoppingCart,
@@ -26,7 +25,6 @@ import {
   LocalShipping,
   CheckCircle,
   Phone,
-  Message,
   MyLocation,
   Refresh,
   Cancel,
@@ -48,9 +46,7 @@ const OrderTracker = ({ orderId, onClose }) => {
   const [order, setOrder] = useState(null);
   const [tracking, setTracking] = useState([]);
   const [driverLocation, setDriverLocation] = useState(null);
-  const [socket, setSocket] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [estimatedTime, setEstimatedTime] = useState(null);
   const [showMap, setShowMap] = useState(false);
 
   // WebSocket connection for real-time updates
@@ -58,6 +54,7 @@ const OrderTracker = ({ orderId, onClose }) => {
     if (!orderId) return;
 
     const newSocket = io(process.env.REACT_APP_ORDER_SERVICE_URL || 'http://localhost:3004');
+    setSocket(newSocket);
     
     newSocket.on('connect', () => {
       console.log('Connected to order tracking');
